@@ -1,0 +1,24 @@
+default_action: allow
+
+rules:
+  - name: block-deletes
+    tool: "delete_*"
+    action: block
+    reason: "irreversible actions are never auto-allowed"
+
+  - name: approve-large-transfers
+    tool: "transfer_funds"
+    action: approve
+    reason: "transfers over $500 require human approval"
+    condition:
+      type: arg_exceeds
+      arg: amount
+      threshold: 500
+
+  - name: approve-broad-emails
+    tool: "send_email"
+    action: approve
+    reason: "broad-distribution emails require approval"
+    condition:
+      type: any_arg_contains
+      substrings: ["all-staff", "external"]
