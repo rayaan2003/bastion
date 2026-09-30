@@ -12,7 +12,7 @@ In scope:
 - [x] Human-in-the-loop approval for flagged actions (console handler +
       Slack handler, both done)
 - [x] Declarative (YAML) policy config, so rules aren't hand-written Python
-- [ ] Basic PII/secrets scan on tool-call args + LLM outputs
+- [x] Basic PII/secrets scan on tool-call args + LLM outputs
 - [ ] Audit log dashboard — every call, decision, timestamp, agent/session id
 
 Explicitly OUT of v1 (defer):
@@ -70,19 +70,32 @@ Built and verified (tests passing, demo run end-to-end):
   declared in `pyproject.toml` but never imported anywhere — caught by
   actually checking, not assuming the dependency list was accurate
 
-Total: 17 tests passing, `ruff check .` / `mypy src` / `pytest -q` all clean
-with dev+langgraph+slack extras installed.
+- `scanning.py` — regex-based detectors (email, US SSN, credit card w/ Luhn
+  validation, AWS access/secret keys, common API key formats, private key
+  blocks); `scan_text()`, `redact()`, `contains_pii()` (a `PolicyEngine`
+  condition for tool-call args), `enforce_text_policy()` (block/redact
+  applied directly to arbitrary text, e.g. an LLM response, outside the
+  tool-call path — this is deliberately a standalone function rather than
+  a framework-specific hook, since no LLM-call interception exists yet in
+  any integration). Chose regex over Microsoft Presidio: no spaCy/ML model
+  dependency, matches "basic" scope, easy to extend later if the
+  false-negative rate becomes a real problem
+- `contains_pii` wired into the YAML condition registry (`type: contains_pii`)
+- `tests/test_scanning.py` — 14 tests, including a real check that Luhn
+  validation actually rejects a non-Luhn 16-digit sequence (not just that
+  the assertion happens to pass)
+- `examples/pii_scanning_example.py` — verified end-to-end: blocks a tool
+  call with an SSN in its args, allows a clean call through, blocks/redacts
+  PII in a standalone text string (the "LLM output" case)
+
+Total: 31 tests passing, `ruff check .` / `mypy src` / `pytest -q` all clean.
 
 ## Next up, in order
 
-1. **PII/secrets scanning.** Add a scan step on tool args and LLM outputs.
-   Evaluate Microsoft Presidio (local, no API cost, slower) vs. a hosted
-   API (faster to integrate, ongoing cost, sends data externally — probably
-   wrong default for a security tool). Leaning local-first.
-2. **Dashboard.** Next.js + Postgres. Views: audit log (searchable/filterable),
+1. **Dashboard.** Next.js + Postgres. Views: audit log (searchable/filterable),
    policy config editor, pending-approval queue. This is what turns the raw
    JSONL log into the compliance artifact enterprises actually want.
-3. **Ship v1 publicly.** OSS SDK on GitHub/PyPI + hosted dashboard waitlist.
+2. **Ship v1 publicly.** OSS SDK on GitHub/PyPI + hosted dashboard waitlist.
    Get 5-10 real teams to install it before iterating further — see GTM
    notes in NOTES.md.
 

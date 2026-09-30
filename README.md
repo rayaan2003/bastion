@@ -63,6 +63,30 @@ policy = load_policy_from_yaml("policy.yaml")
 See `examples/policy.yaml` for the schema and `examples/yaml_policy_example.py`
 for a runnable demo.
 
+## PII / secrets scanning
+
+Regex-based detection (email, US SSN, Luhn-validated credit card numbers,
+AWS credentials, common API key formats, private key blocks) — no ML model
+dependency. Use it as a policy condition on tool-call args, or directly on
+LLM output text:
+
+```python
+from agentguard import Rule, Action, contains_pii, enforce_text_policy
+
+policy.add_rule(Rule(
+    tool_pattern="*",
+    action=Action.BLOCK,
+    condition=contains_pii(["ssn_us", "credit_card"]),
+    reason="tool call args contain PII/secrets",
+))
+
+# directly on an LLM response, outside the tool-call path:
+enforce_text_policy(llm_output, categories=["email"], on_detect="redact")
+```
+
+Also available as a YAML condition type: `type: contains_pii`. See
+`examples/pii_scanning_example.py`.
+
 ## LangGraph integration
 
 ```python

@@ -90,5 +90,6 @@ Async log shipped to backend -> Dashboard (Next.js + Postgres)
   rename before any public launch
 - Where policy config lives long-term (per-project YAML file vs. pulled from
   a hosted dashboard) — see PLAN.md
-- PII/secrets detection: which library/API to lean on (e.g. Microsoft
-  Presidio for local, or a hosted API) — not yet decided
+- PII/secrets detection: went regex-based for v1, not Presidio/ML-based
+  (2026-09-30) — no model dependency, matches "basic" v1 scope. Revisit if
+  false-negative rate becomes a real problem once there are real users.

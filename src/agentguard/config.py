@@ -35,6 +35,7 @@ from agentguard.policy import (
     arg_exceeds,
     arg_matches_regex,
 )
+from agentguard.scanning import contains_pii
 
 Condition = Callable[[dict[str, Any]], bool]
 _ConditionBuilder = Callable[[dict[str, Any]], Condition]
@@ -43,6 +44,7 @@ _CONDITION_BUILDERS: dict[str, _ConditionBuilder] = {
     "arg_exceeds": lambda cfg: arg_exceeds(cfg["arg"], cfg["threshold"]),
     "arg_matches_regex": lambda cfg: arg_matches_regex(cfg["arg"], cfg["pattern"]),
     "any_arg_contains": lambda cfg: any_arg_contains(cfg["substrings"]),
+    "contains_pii": lambda cfg: contains_pii(cfg.get("categories")),
 }
 
 
