@@ -114,6 +114,21 @@ approval_handler = SlackApprovalHandler(
 Posts a message and polls for a ✅/❌ reaction — no webhook server required.
 Denies by default if nobody responds within `timeout` seconds (fail-closed).
 
+## Dashboard
+
+A separate Next.js app under `dashboard/` — audit log viewer and approval
+queue with a UI, instead of a local JSONL file and a terminal prompt:
+
+```python
+from agentguard import AuditLogger, guard
+from agentguard.integrations.dashboard import DashboardApprovalHandler, dashboard_audit_sink
+
+audit = AuditLogger(sink=dashboard_audit_sink("http://localhost:3000"))
+approval_handler = DashboardApprovalHandler("http://localhost:3000")
+```
+
+See `dashboard/README.md` for setup.
+
 ## Tests
 
 ```bash

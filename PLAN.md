@@ -13,7 +13,7 @@ In scope:
       Slack handler, both done)
 - [x] Declarative (YAML) policy config, so rules aren't hand-written Python
 - [x] Basic PII/secrets scan on tool-call args + LLM outputs
-- [ ] Audit log dashboard — every call, decision, timestamp, agent/session id
+- [x] Audit log dashboard — every call, decision, timestamp, agent/session id
 
 Explicitly OUT of v1 (defer):
 - Prompt-injection detection (commoditized, low differentiation)
@@ -88,16 +88,57 @@ Built and verified (tests passing, demo run end-to-end):
   call with an SSN in its args, allows a clean call through, blocks/redacts
   PII in a standalone text string (the "LLM output" case)
 
-Total: 31 tests passing, `ruff check .` / `mypy src` / `pytest -q` all clean.
+- `dashboard/` — a separate Next.js (TypeScript, App Router) app, not part
+  of the Python package. Database: PGlite (embedded Postgres compiled to
+  WASM, file-persisted under `dashboard/data/`, gitignored) rather than a
+  hosted Postgres instance — deliberate v1 choice so there's nothing to
+  stand up before there are real users; doesn't support concurrent writers
+  from multiple processes, swap for real Postgres (`pg` + a connection
+  string) when that matters. Schema in `dashboard/lib/schema.sql`, applied
+  idempotently on startup, no migration tooling at this scale.
+  - `/audit` — filterable audit log table (tool name / action / session id)
+  - `/approvals` — pending-approval queue, Approve/Deny buttons (Server Actions)
+  - API: `POST/GET /api/events`, `POST/GET /api/approvals`,
+    `GET /api/approvals/[id]`, `POST /api/approvals/[id]/decide`
+  - Found and fixed two real bugs via an actual production build, not just
+    "it compiled": (1) PGlite's data directory didn't exist yet on first
+    run (`fs.mkdirSync(..., {recursive: true})` before opening it), and
+    (2) Next.js tried to statically prerender `/approvals` and `/audit` at
+    build time even though they read live DB state on every request
+    (`export const dynamic = "force-dynamic"` on both). Also hit and fixed
+    a PGlite + Next.js bundling incompatibility (WASM asset resolution
+    breaks when bundled) via `serverExternalPackages` in `next.config.ts`
+  - Verified the full flow with real HTTP calls against the running dev
+    server, not just reading the code: posted an audit event and confirmed
+    it rendered on `/audit` with correct filtering; created an approval,
+    polled it as pending, decided it via the API (same function the
+    Approve/Deny buttons call), confirmed it left the pending list, and
+    confirmed a second decision attempt on an already-decided approval is
+    correctly rejected (404) rather than silently overwriting
+- `src/agentguard/integrations/dashboard.py` — `dashboard_audit_sink()` (an
+  `AuditLogger` sink that POSTs to `/api/events` instead of writing JSONL)
+  and `DashboardApprovalHandler` (creates a pending approval via the API,
+  polls until a reviewer decides it on `/approvals`, fails closed/denies on
+  timeout — same pattern as `SlackApprovalHandler`). Stdlib `urllib` only,
+  no new dependency.
+- `tests/test_dashboard_integration.py` — 3 tests against a real stdlib
+  `http.server` standing in for the dashboard API (actual HTTP calls over
+  a real socket, not mocked `urllib`): event posting, polling-until-approved,
+  and deny-on-timeout.
+
+Total: 34 Python tests passing, `ruff check .` / `mypy src` / `pytest -q`
+all clean. Dashboard: `npx eslint .` clean, `npm run build` clean.
 
 ## Next up, in order
 
-1. **Dashboard.** Next.js + Postgres. Views: audit log (searchable/filterable),
-   policy config editor, pending-approval queue. This is what turns the raw
-   JSONL log into the compliance artifact enterprises actually want.
+1. **Policy config editor in the dashboard.** Currently the dashboard only
+   shows audit logs and approvals — editing `policy.yaml` still happens by
+   hand. Lower priority than it sounds: the YAML format already makes this
+   readable by a non-engineer without a UI.
 2. **Ship v1 publicly.** OSS SDK on GitHub/PyPI + hosted dashboard waitlist.
    Get 5-10 real teams to install it before iterating further — see GTM
-   notes in NOTES.md.
+   notes in NOTES.md. This is the actual next priority over further
+   features — the MVP scope from this file is now fully built.
 
 ## Definition of done (every item above)
 
