@@ -10,7 +10,7 @@
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white)](pyproject.toml)
 [![Type checked: mypy strict](https://img.shields.io/badge/mypy-strict-2A6DB2.svg)](pyproject.toml)
-[![PyPI](https://img.shields.io/badge/pypi-coming%20soon-yellow.svg)](CHANGELOG.md)
+[![PyPI](https://img.shields.io/pypi/v/bastionguard.svg)](https://pypi.org/project/bastionguard/)
 
 **[Quickstart](#quickstart)** · **[Framework integrations](#framework-integrations)** · **[Dashboard](#dashboard)** · **[Live demo](https://bastion-dashboard-two.vercel.app)** · **[Why](#why)**
 
@@ -241,8 +241,7 @@ hard rule here.
 
 Pre-1.0. Core SDK, all three framework integrations, and the dashboard are
 built and tested — see [CHANGELOG.md](CHANGELOG.md) for what's shipped and
-[PLAN.md](PLAN.md) for what's next. Not yet on PyPI; install from source
-for now (see [CONTRIBUTING.md](CONTRIBUTING.md)).
+[PLAN.md](PLAN.md) for what's next.
 
 ## Contributing
 
