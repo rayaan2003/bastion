@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireApiKey } from "@/lib/credentials";
 import { getApproval } from "@/lib/approvals";
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const unauthorized = requireApiKey(request);
+  if (unauthorized) return unauthorized;
+
   const { id } = await params;
   const approval = await getApproval(id);
   if (!approval) {

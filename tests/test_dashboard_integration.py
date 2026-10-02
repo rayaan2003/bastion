@@ -1,5 +1,6 @@
 import json
 import threading
+import urllib.error
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import pytest
@@ -7,11 +8,14 @@ import pytest
 from agentguard.audit import AuditEvent
 from agentguard.integrations.dashboard import DashboardApprovalHandler, dashboard_audit_sink
 
+_API_KEY = "test-api-key"
+
 
 class _FakeDashboardServer:
     """A minimal stand-in for the real dashboard's API, serving real HTTP
     on a background thread, so the SDK's urllib calls are exercised for
-    real rather than mocked."""
+    real rather than mocked. Enforces the same Bearer API key check as the
+    real dashboard's requireApiKey()."""
 
     def __init__(self, approve_after: int = 1):
         self.received_events: list[dict] = []
@@ -48,7 +52,14 @@ class _FakeDashboardServer:
                 self.end_headers()
                 self.wfile.write(body)
 
+            def _authorized(self) -> bool:
+                return self.headers.get("Authorization") == f"Bearer {_API_KEY}"
+
             def do_POST(self):
+                if not self._authorized():
+                    self._send_json(401, {"error": "unauthorized"})
+                    return
+
                 length = int(self.headers.get("Content-Length", 0))
                 body = json.loads(self.rfile.read(length) or b"{}")
 
@@ -67,6 +78,10 @@ class _FakeDashboardServer:
                 self._send_json(404, {"error": "not found"})
 
             def do_GET(self):
+                if not self._authorized():
+                    self._send_json(401, {"error": "unauthorized"})
+                    return
+
                 prefix = "/api/approvals/"
                 if self.path.startswith(prefix):
                     approval_id = self.path[len(prefix):]
@@ -88,7 +103,7 @@ def fake_server():
 
 
 def test_dashboard_audit_sink_posts_event(fake_server):
-    sink = dashboard_audit_sink(fake_server.base_url)
+    sink = dashboard_audit_sink(fake_server.base_url, _API_KEY)
     event = AuditEvent(
         id="evt-1",
         timestamp=123.0,
@@ -105,8 +120,27 @@ def test_dashboard_audit_sink_posts_event(fake_server):
     assert fake_server.received_events[0]["action"] == "blocked"
 
 
+def test_dashboard_audit_sink_rejects_wrong_api_key(fake_server):
+    sink = dashboard_audit_sink(fake_server.base_url, "wrong-key")
+    event = AuditEvent(
+        id="evt-1",
+        timestamp=123.0,
+        session_id="sess-1",
+        tool_name="delete_user",
+        args={},
+        action="blocked",
+        reason="irreversible",
+    )
+    with pytest.raises(urllib.error.HTTPError) as exc_info:
+        sink(event)
+    assert exc_info.value.code == 401
+    assert fake_server.received_events == []
+
+
 def test_dashboard_approval_handler_polls_until_approved(fake_server):
-    handler = DashboardApprovalHandler(fake_server.base_url, poll_interval=0.01, timeout=5)
+    handler = DashboardApprovalHandler(
+        fake_server.base_url, _API_KEY, poll_interval=0.01, timeout=5
+    )
     result = handler.request_approval("transfer_funds", {"amount": 600}, "large transfer")
     assert result is True
 
@@ -114,7 +148,9 @@ def test_dashboard_approval_handler_polls_until_approved(fake_server):
 def test_dashboard_approval_handler_denies_on_timeout():
     server = _FakeDashboardServer(approve_after=10_000)  # never approves within the timeout
     try:
-        handler = DashboardApprovalHandler(server.base_url, poll_interval=0.01, timeout=0.1)
+        handler = DashboardApprovalHandler(
+            server.base_url, _API_KEY, poll_interval=0.01, timeout=0.1
+        )
         result = handler.request_approval("transfer_funds", {"amount": 600}, "large transfer")
         assert result is False
     finally:

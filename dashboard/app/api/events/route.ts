@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireApiKey } from "@/lib/credentials";
 import { insertEvent, listEvents } from "@/lib/events";
 
 export async function POST(request: NextRequest) {
+  const unauthorized = requireApiKey(request);
+  if (unauthorized) return unauthorized;
+
   const body = await request.json();
 
   const { id, timestamp, session_id, tool_name, args, action, reason } = body;
@@ -26,6 +30,9 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
+  const unauthorized = requireApiKey(request);
+  if (unauthorized) return unauthorized;
+
   const { searchParams } = new URL(request.url);
   const events = await listEvents({
     toolName: searchParams.get("tool_name") ?? undefined,

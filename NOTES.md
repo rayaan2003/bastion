@@ -82,6 +82,11 @@ Async log shipped to backend -> Dashboard (Next.js + Postgres)
   pytest, GitHub Actions CI — rather than retrofitting later. Reasoning: this
   is meant to be an OSS security tool; code quality and typed public APIs are
   part of the trust signal, not polish to add after traction.
+- 2026-10-02: Dashboard shipped with zero auth initially (fine for
+  single-user localhost dev, not fine for anything beyond that) — flagged
+  immediately and fixed same session rather than deferred. Two separate
+  mechanisms (human session login vs. SDK API key) rather than one, because
+  the Python SDK has no browser session to authenticate with.
 
 ## Open questions
 

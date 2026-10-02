@@ -123,11 +123,13 @@ queue with a UI, instead of a local JSONL file and a terminal prompt:
 from agentguard import AuditLogger, guard
 from agentguard.integrations.dashboard import DashboardApprovalHandler, dashboard_audit_sink
 
-audit = AuditLogger(sink=dashboard_audit_sink("http://localhost:3000"))
-approval_handler = DashboardApprovalHandler("http://localhost:3000")
+api_key = "..."  # must match DASHBOARD_API_KEY in the dashboard's env
+audit = AuditLogger(sink=dashboard_audit_sink("http://localhost:3000", api_key))
+approval_handler = DashboardApprovalHandler("http://localhost:3000", api_key)
 ```
 
-See `dashboard/README.md` for setup.
+The dashboard UI itself is behind a separate login (session cookie, not this
+API key) — see `dashboard/README.md` for the full auth model and setup.
 
 ## Tests
 

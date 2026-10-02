@@ -24,7 +24,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-neutral-950 text-neutral-100">
-        <nav className="border-b border-neutral-800 px-6 py-4 flex gap-6 text-sm">
+        <nav className="border-b border-neutral-800 px-6 py-4 flex gap-6 text-sm items-center">
           <span className="font-semibold">agentguard</span>
           <a href="/audit" className="text-neutral-400 hover:text-neutral-100">
             Audit Log
@@ -32,6 +32,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <a href="/approvals" className="text-neutral-400 hover:text-neutral-100">
             Approvals
           </a>
+          <form action="/api/auth/logout" method="post" className="ml-auto">
+            <button type="submit" className="text-neutral-400 hover:text-neutral-100">
+              Sign out
+            </button>
+          </form>
         </nav>
         <main className="flex-1 px-6 py-8">{children}</main>
       </body>

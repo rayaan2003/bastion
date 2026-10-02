@@ -22,14 +22,31 @@ See `NOTES.md` at the repo root for the full reasoning.
 Schema lives in `lib/schema.sql` and is applied (idempotently) on startup —
 no separate migration step at this scale.
 
+## Auth
+
+Two separate mechanisms, deliberately not shared:
+
+- **Human login** (`/login`) — a single shared password (`DASHBOARD_PASSWORD`),
+  sets a signed, httpOnly session cookie (`DASHBOARD_SESSION_SECRET`) via
+  middleware that gates `/`, `/audit`, and `/approvals`. Sign out from the
+  nav bar.
+- **SDK API key** (`DASHBOARD_API_KEY`) — every `/api/*` route requires
+  `Authorization: Bearer <key>`. This is what the Python SDK sends; it has
+  no browser session, so it can't use the login cookie.
+
+Copy `.env.example` to `.env.local` and fill in real values (the example
+file has a one-liner to generate strong random secrets) before running
+anything beyond a quick look at the UI with no backing data.
+
 ## Dev setup
 
 ```bash
 npm install
+cp .env.example .env.local   # then edit in real secrets
 npm run dev
 ```
 
-Opens at http://localhost:3000, redirects to `/audit`.
+Opens at http://localhost:3000, redirects to `/login` until you sign in.
 
 ## Wiring up the Python SDK
 
@@ -37,8 +54,9 @@ Opens at http://localhost:3000, redirects to `/audit`.
 from agentguard import AuditLogger, guard
 from agentguard.integrations.dashboard import DashboardApprovalHandler, dashboard_audit_sink
 
-audit = AuditLogger(sink=dashboard_audit_sink("http://localhost:3000"))
-approval_handler = DashboardApprovalHandler("http://localhost:3000")
+api_key = "..."  # must match DASHBOARD_API_KEY in the dashboard's env
+audit = AuditLogger(sink=dashboard_audit_sink("http://localhost:3000", api_key))
+approval_handler = DashboardApprovalHandler("http://localhost:3000", api_key)
 
 guarded_fn = guard(my_tool, policy=policy, audit=audit, approval_handler=approval_handler)
 ```

@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireApiKey } from "@/lib/credentials";
 import { decideApproval } from "@/lib/approvals";
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const unauthorized = requireApiKey(request);
+  if (unauthorized) return unauthorized;
+
   const { id } = await params;
   const body = await request.json();
   const { decision } = body;

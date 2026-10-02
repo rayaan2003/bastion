@@ -121,13 +121,47 @@ Built and verified (tests passing, demo run end-to-end):
   polls until a reviewer decides it on `/approvals`, fails closed/denies on
   timeout — same pattern as `SlackApprovalHandler`). Stdlib `urllib` only,
   no new dependency.
-- `tests/test_dashboard_integration.py` — 3 tests against a real stdlib
+- `tests/test_dashboard_integration.py` — 4 tests against a real stdlib
   `http.server` standing in for the dashboard API (actual HTTP calls over
-  a real socket, not mocked `urllib`): event posting, polling-until-approved,
-  and deny-on-timeout.
+  a real socket, not mocked `urllib`): event posting, wrong-API-key
+  rejection, polling-until-approved, and deny-on-timeout.
 
-Total: 34 Python tests passing, `ruff check .` / `mypy src` / `pytest -q`
+Total: 35 Python tests passing, `ruff check .` / `mypy src` / `pytest -q`
 all clean. Dashboard: `npx eslint .` clean, `npm run build` clean.
+
+### Dashboard auth (2026-10-02)
+
+The dashboard had zero authentication through the first build — anyone who
+could reach its URL could view the audit log and approve/deny pending
+actions, which undermines the point of a security/compliance tool. Added
+two independent mechanisms, deliberately not shared:
+
+- **Human login** — `lib/session.ts` (edge-safe, `jose`-based JWT signing,
+  used by `middleware.ts` and the login route) + `lib/credentials.ts`
+  (node:crypto, timing-safe password comparison, Node-runtime only).
+  `/login` page, `/api/auth/login` and `/api/auth/logout` routes, a session
+  cookie (httpOnly, signed, 7-day expiry) gates `/`, `/audit`, `/approvals`
+  via middleware.
+- **SDK API key** — every `/api/*` route now calls `requireApiKey()`
+  (`Authorization: Bearer <key>`, timing-safe comparison) before doing
+  anything else. Separate from the session cookie because the Python SDK
+  has no browser session to present.
+- Split `lib/session.ts` (edge-safe) from `lib/credentials.ts` (node:crypto)
+  deliberately: Next.js middleware runs on the Edge runtime by default,
+  which cannot import `node:crypto` — even transitively, even if the
+  function using it is never called from that file. Mixing them in one
+  module would have broken the build or silently failed at the edge.
+- `dashboard_audit_sink()` and `DashboardApprovalHandler` both now take a
+  required `api_key` argument and send it as a Bearer token.
+- Verified against a live server with real env vars, not just unit tests:
+  unauthenticated `/audit` redirects to `/login`; wrong password rejected,
+  correct password sets a working session cookie that then grants access;
+  `/api/events` POST returns 401 with no key or the wrong key, 201 with the
+  right one; ran the actual Python SDK (`dashboard_audit_sink`,
+  `DashboardApprovalHandler`) against the live authenticated server end to
+  end, including the full polling-approval loop in a background thread
+  while approving it via the API mid-poll — confirmed it returns `True`
+  exactly when expected, not just that it doesn't crash.
 
 ## Next up, in order
 
