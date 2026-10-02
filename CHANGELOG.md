@@ -3,7 +3,7 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
-## [0.1.0] - 2026-10-02
+## [0.1.0] - 2026-10-03
 
 First published release.
 
