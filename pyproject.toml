@@ -1,5 +1,5 @@
 [project]
-name = "bastion"
+name = "bastionguard"
 version = "0.1.0"
 description = "Runtime policy enforcement for AI agent tool calls — block, approve, or log unsafe actions before they execute."
 readme = "README.md"

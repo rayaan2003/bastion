@@ -55,8 +55,9 @@ actually allowed to **do**.
 
 ## Quickstart
 
-> Not on PyPI yet (see the badge above) — install from source for now:
-> `pip install git+https://github.com/rayaan2003/bastion.git`
+> `pip install bastionguard` — the PyPI distribution is named `bastionguard`
+> (plain `bastion` was already taken — an old Python 2 stdlib module, of
+> all things). The import name is unaffected: still `import bastion`.
 
 ```python
 from bastion import PolicyEngine, Rule, Action, guard
@@ -108,7 +109,7 @@ A blocked or approval-denied call comes back as a normal error `ToolMessage`
 of the graph run crashing. See [`examples/langgraph_demo.py`](examples/langgraph_demo.py).
 
 ```bash
-pip install "bastion[langgraph]"
+pip install "bastionguard[langgraph]"
 ```
 </details>
 
@@ -128,7 +129,7 @@ exception, so the model sees why and can react. See
 [`examples/openai_agents_demo.py`](examples/openai_agents_demo.py).
 
 ```bash
-pip install "bastion[openai-agents]"
+pip install "bastionguard[openai-agents]"
 ```
 </details>
 
@@ -149,7 +150,7 @@ two integrations, nothing needs wrapping per-tool — one callback covers
 everything. See [`examples/claude_agent_sdk_demo.py`](examples/claude_agent_sdk_demo.py).
 
 ```bash
-pip install "bastion[claude-agent-sdk]"
+pip install "bastionguard[claude-agent-sdk]"
 ```
 </details>
 
@@ -216,14 +217,15 @@ and self-hosting setup.
 ## Install
 
 ```bash
-pip install bastion@git+https://github.com/rayaan2003/bastion.git
+pip install bastionguard
 # with a framework integration:
-pip install "bastion[langgraph]@git+https://github.com/rayaan2003/bastion.git"
+pip install "bastionguard[langgraph]"   # or [openai-agents] / [claude-agent-sdk]
+# with Slack approval:
+pip install "bastionguard[slack]"
 ```
 
 For local development (editable install, running the test suite), see
-[CONTRIBUTING.md](CONTRIBUTING.md). Will switch to plain `pip install
-bastion` once published — see [CHANGELOG.md](CHANGELOG.md).
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Tests
 
