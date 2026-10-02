@@ -1,9 +1,9 @@
-from agentguard.approval import ApprovalHandler, ConsoleApprovalHandler
-from agentguard.audit import AuditLogger
-from agentguard.config import PolicyConfigError, load_policy_from_yaml
-from agentguard.guard import guard, guard_tools
-from agentguard.policy import Action, PolicyEngine, Rule
-from agentguard.scanning import (
+from bastion.approval import ApprovalHandler, ConsoleApprovalHandler
+from bastion.audit import AuditLogger
+from bastion.config import PolicyConfigError, load_policy_from_yaml
+from bastion.guard import guard, guard_tools
+from bastion.policy import Action, PolicyEngine, Rule
+from bastion.scanning import (
     SensitiveContentBlocked,
     contains_pii,
     enforce_text_policy,

@@ -7,7 +7,7 @@ import { savePolicyVersion } from "@/lib/policy";
 //
 // Only validates that the text is syntactically valid YAML. Deeper
 // semantic validation (unknown condition type, missing rule fields, etc.)
-// happens Python-side in agentguard.config when the SDK actually loads it
+// happens Python-side in bastion.config when the SDK actually loads it
 // - duplicating that rule-schema logic in TypeScript isn't worth the
 // maintenance burden of keeping two implementations in sync.
 export async function POST(request: NextRequest) {

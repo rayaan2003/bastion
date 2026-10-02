@@ -1,8 +1,8 @@
 import pytest
 
-from agentguard import Action, PolicyConfigError, load_policy_from_yaml
-from agentguard.config import policy_from_dict, policy_from_yaml_string
-from agentguard.guard import BlockedByPolicy, guard
+from bastion import Action, PolicyConfigError, load_policy_from_yaml
+from bastion.config import policy_from_dict, policy_from_yaml_string
+from bastion.guard import BlockedByPolicy, guard
 
 
 def test_load_policy_from_yaml_file(tmp_path):

@@ -22,7 +22,7 @@ class ApprovalHandler(ABC):
 
 class ConsoleApprovalHandler(ApprovalHandler):
     def request_approval(self, tool_name: str, args: dict[str, Any], reason: str) -> bool:
-        print(f"\n[agentguard] APPROVAL REQUIRED for tool '{tool_name}'")
+        print(f"\n[bastion] APPROVAL REQUIRED for tool '{tool_name}'")
         print(f"  args: {args}")
         print(f"  reason: {reason}")
         answer = input("  approve? [y/N]: ").strip().lower()

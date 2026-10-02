@@ -44,4 +44,4 @@ what's shipped on `master`.
 - Production tooling from day one: `ruff`, `mypy --strict`, `pytest`,
   GitHub Actions CI.
 
-[Unreleased]: https://github.com/rayaan2003/agentguard/compare/7570dc8...HEAD
+[Unreleased]: https://github.com/rayaan2003/bastion/compare/7570dc8...HEAD

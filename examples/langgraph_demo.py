@@ -1,6 +1,6 @@
 """LangGraph demo — a tiny agent with a guarded tool node.
 
-Requires: pip install agentguard[langgraph] langchain-openai (or any chat model)
+Requires: pip install bastion[langgraph] langchain-openai (or any chat model)
 
 Run: python examples/langgraph_demo.py
 """
@@ -8,9 +8,9 @@ Run: python examples/langgraph_demo.py
 from langchain_core.tools import tool
 from langgraph.graph import END, START, MessagesState, StateGraph
 
-from agentguard import Action, AuditLogger, PolicyEngine, Rule
-from agentguard.integrations.langgraph import guarded_tool_node
-from agentguard.policy import any_arg_contains
+from bastion import Action, AuditLogger, PolicyEngine, Rule
+from bastion.integrations.langgraph import guarded_tool_node
+from bastion.policy import any_arg_contains
 
 
 @tool

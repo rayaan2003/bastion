@@ -1,6 +1,6 @@
 # Security Policy
 
-agentguard is a security tool, so we take reports about it seriously.
+bastion is a security tool, so we take reports about it seriously.
 
 ## Reporting a vulnerability
 
@@ -18,7 +18,7 @@ notes unless you'd prefer otherwise.
 
 ## Scope
 
-In scope: the `agentguard` Python package (policy engine, guard logic,
+In scope: the `bastion` Python package (policy engine, guard logic,
 framework integrations, scanning) and the `dashboard/` Next.js app.
 
 A policy you configure incorrectly (e.g. an overly permissive rule) is a

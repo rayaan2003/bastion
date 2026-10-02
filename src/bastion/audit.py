@@ -42,7 +42,7 @@ def _jsonl_sink(path: Path) -> Sink:
 
 
 class AuditLogger:
-    def __init__(self, log_path: str = "agentguard_audit.jsonl", session_id: str | None = None,
+    def __init__(self, log_path: str = "bastion_audit.jsonl", session_id: str | None = None,
                  sink: Sink | None = None):
         self.session_id = session_id or str(uuid.uuid4())
         self.sink = sink or _jsonl_sink(Path(log_path))

@@ -2,8 +2,8 @@
 
 Usage:
 
-    from agentguard import PolicyEngine, Rule, Action
-    from agentguard.integrations.openai_agents import guarded_tools
+    from bastion import PolicyEngine, Rule, Action
+    from bastion.integrations.openai_agents import guarded_tools
 
     policy = PolicyEngine()
     policy.add_rule(Rule(tool_pattern="delete_*", action=Action.BLOCK, reason="destructive"))
@@ -21,7 +21,7 @@ SDK's tool invocation is async, so an approval wait here blocks the event
 loop for its duration — fine for a single agent run, worth knowing if
 you're running many agents concurrently on one loop.
 
-Requires the `openai-agents` extra: pip install agentguard[openai-agents]
+Requires the `openai-agents` extra: pip install bastion[openai-agents]
 """
 
 from __future__ import annotations
@@ -31,10 +31,10 @@ import json
 from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any
 
-from agentguard.approval import ApprovalHandler, ConsoleApprovalHandler
-from agentguard.audit import AuditLogger
-from agentguard.guard import evaluate_and_record
-from agentguard.policy import PolicyEngine
+from bastion.approval import ApprovalHandler, ConsoleApprovalHandler
+from bastion.audit import AuditLogger
+from bastion.guard import evaluate_and_record
+from bastion.policy import PolicyEngine
 
 if TYPE_CHECKING:
     from agents import FunctionTool
@@ -56,7 +56,7 @@ def guarded_tools(
     except ImportError as e:
         raise ImportError(
             "openai-agents is required for this integration. "
-            "Install with: pip install agentguard[openai-agents]"
+            "Install with: pip install bastion[openai-agents]"
         ) from e
 
     audit = audit or AuditLogger()

@@ -15,7 +15,7 @@ labels: bug
 ```
 
 **Environment**
-- agentguard version:
+- bastion version:
 - Python version:
 - Framework integration (LangGraph / OpenAI Agents SDK / Claude Agent SDK / none):
 - OS:

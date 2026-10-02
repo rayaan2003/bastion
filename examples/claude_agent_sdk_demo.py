@@ -1,6 +1,6 @@
 """Claude Agent SDK demo — guarded_can_use_tool wired into ClaudeAgentOptions.
 
-Requires: pip install agentguard[claude-agent-sdk]
+Requires: pip install bastion[claude-agent-sdk]
 
 Running a full query (claude_agent_sdk.query(...) / ClaudeSDKClient) shells
 out to the Claude Code CLI and needs it installed and authenticated. This
@@ -16,8 +16,8 @@ import asyncio
 
 from claude_agent_sdk import ClaudeAgentOptions, ToolPermissionContext
 
-from agentguard import Action, AuditLogger, PolicyEngine, Rule
-from agentguard.integrations.claude_agent_sdk import guarded_can_use_tool
+from bastion import Action, AuditLogger, PolicyEngine, Rule
+from bastion.integrations.claude_agent_sdk import guarded_can_use_tool
 
 
 def build_options() -> ClaudeAgentOptions:

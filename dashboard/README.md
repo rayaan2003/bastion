@@ -1,6 +1,6 @@
-# agentguard dashboard
+# bastion dashboard
 
-Audit log viewer and human-approval queue for the `agentguard` Python SDK
+Audit log viewer and human-approval queue for the `bastion` Python SDK
 (see the repo root). Two pages:
 
 - **`/audit`** — every tool-call decision the SDK recorded (allowed /
@@ -16,7 +16,7 @@ Audit log viewer and human-approval queue for the `agentguard` Python SDK
 
 ## Live deployment
 
-https://agentguard-dashboard-nine.vercel.app (Vercel + Supabase Postgres)
+https://bastion-dashboard-two.vercel.app (Vercel + Supabase Postgres)
 
 ## Database
 
@@ -93,8 +93,8 @@ again:
 ## Wiring up the Python SDK
 
 ```python
-from agentguard import AuditLogger, guard
-from agentguard.integrations.dashboard import (
+from bastion import AuditLogger, guard
+from bastion.integrations.dashboard import (
     DashboardApprovalHandler,
     dashboard_audit_sink,
     load_policy_from_dashboard,

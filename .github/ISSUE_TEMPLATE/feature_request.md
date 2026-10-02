@@ -1,6 +1,6 @@
 ---
 name: Feature request
-about: Suggest something agentguard should do
+about: Suggest something bastion should do
 labels: enhancement
 ---
 

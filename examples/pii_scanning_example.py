@@ -4,9 +4,9 @@ text directly with enforce_text_policy().
 Run: python examples/pii_scanning_example.py
 """
 
-from agentguard import Action, PolicyEngine, Rule, contains_pii, enforce_text_policy, guard
-from agentguard.guard import BlockedByPolicy
-from agentguard.scanning import SensitiveContentBlocked
+from bastion import Action, PolicyEngine, Rule, contains_pii, enforce_text_policy, guard
+from bastion.guard import BlockedByPolicy
+from bastion.scanning import SensitiveContentBlocked
 
 
 def log_customer_note(body: str) -> str:

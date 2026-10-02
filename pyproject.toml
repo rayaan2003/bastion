@@ -1,5 +1,5 @@
 [project]
-name = "agentguard"
+name = "bastion"
 version = "0.1.0"
 description = "Runtime policy enforcement for AI agent tool calls — block, approve, or log unsafe actions before they execute."
 readme = "README.md"
@@ -33,10 +33,10 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/rayaan2003/agentguard"
-Repository = "https://github.com/rayaan2003/agentguard"
-Issues = "https://github.com/rayaan2003/agentguard/issues"
-Changelog = "https://github.com/rayaan2003/agentguard/blob/master/CHANGELOG.md"
+Homepage = "https://github.com/rayaan2003/bastion"
+Repository = "https://github.com/rayaan2003/bastion"
+Issues = "https://github.com/rayaan2003/bastion/issues"
+Changelog = "https://github.com/rayaan2003/bastion/blob/master/CHANGELOG.md"
 
 [project.optional-dependencies]
 claude-agent-sdk = ["claude-agent-sdk>=0.1"]
@@ -53,7 +53,7 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
-agentguard = ["py.typed"]
+bastion = ["py.typed"]
 
 [tool.ruff]
 line-length = 100

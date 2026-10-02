@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "agentguard dashboard",
-  description: "Audit log and approval queue for agentguard-enforced AI agent tool calls.",
+  title: "bastion dashboard",
+  description: "Audit log and approval queue for bastion-enforced AI agent tool calls.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -25,7 +25,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col bg-neutral-950 text-neutral-100">
         <nav className="border-b border-neutral-800 px-6 py-4 flex gap-6 text-sm items-center">
-          <span className="font-semibold">agentguard</span>
+          <span className="font-semibold">bastion</span>
           <a href="/audit" className="text-neutral-400 hover:text-neutral-100">
             Audit Log
           </a>

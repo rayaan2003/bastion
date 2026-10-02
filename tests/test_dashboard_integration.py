@@ -5,8 +5,8 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import pytest
 
-from agentguard.audit import AuditEvent
-from agentguard.integrations.dashboard import (
+from bastion.audit import AuditEvent
+from bastion.integrations.dashboard import (
     DashboardApprovalHandler,
     dashboard_audit_sink,
     load_policy_from_dashboard,
@@ -173,7 +173,7 @@ def test_dashboard_approval_handler_denies_on_timeout():
 
 
 def test_load_policy_from_dashboard():
-    from agentguard import Action
+    from bastion import Action
 
     server = _FakeDashboardServer(policy_yaml="""
 rules:

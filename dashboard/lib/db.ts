@@ -9,7 +9,7 @@ import path from "node:path";
 // concurrent writers) would actually matter. See NOTES.md.
 
 declare global {
-  var __agentguardDb: Promise<Pool> | undefined;
+  var __bastionDb: Promise<Pool> | undefined;
 }
 
 async function createDb(): Promise<Pool> {
@@ -25,8 +25,8 @@ async function createDb(): Promise<Pool> {
 }
 
 export function getDb(): Promise<Pool> {
-  if (!global.__agentguardDb) {
-    global.__agentguardDb = createDb();
+  if (!global.__bastionDb) {
+    global.__bastionDb = createDb();
   }
-  return global.__agentguardDb;
+  return global.__bastionDb;
 }

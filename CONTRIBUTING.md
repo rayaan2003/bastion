@@ -3,8 +3,8 @@
 ## Dev setup
 
 ```bash
-git clone https://github.com/rayaan2003/agentguard.git
-cd agentguard
+git clone https://github.com/rayaan2003/bastion.git
+cd bastion
 python -m venv .venv
 .venv/Scripts/activate   # or source .venv/bin/activate on macOS/Linux
 pip install -e ".[dev,langgraph,slack,openai-agents,claude-agent-sdk]"
@@ -49,5 +49,5 @@ See [dashboard/README.md](dashboard/README.md) for env var setup.
 
 ## Questions
 
-Open an [issue](https://github.com/rayaan2003/agentguard/issues) — happy
+Open an [issue](https://github.com/rayaan2003/bastion/issues) — happy
 to help you get oriented.

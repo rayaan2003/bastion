@@ -4,7 +4,7 @@ Instructions for any AI agent (or human) working in this repository.
 
 ## What this repo is
 
-`agentguard` — a Python SDK that enforces policy on AI agent tool calls
+`bastion` — a Python SDK that enforces policy on AI agent tool calls
 (allow/block/require-approval) and produces an audit log, plus a Next.js
 dashboard (`dashboard/`) for viewing that log and managing approvals/policy
 through a UI. See [NOTES.md](NOTES.md) for product context and
@@ -38,7 +38,7 @@ this file.
 ## Project layout
 
 ```
-src/agentguard/          the package (installed as `agentguard`)
+src/bastion/          the package (installed as `bastion`)
   policy.py               policy engine: Rule, PolicyEngine, Action, conditions
   guard.py                wraps callables/tools with policy enforcement;
                            evaluate_and_record() is the shared policy/audit/
@@ -54,7 +54,7 @@ src/agentguard/          the package (installed as `agentguard`)
     slack.py                  SlackApprovalHandler
     dashboard.py              talks to dashboard/'s HTTP API
 examples/                 runnable, dependency-minimal demos (one per integration)
-tests/                    pytest suite, mirrors src/agentguard structure —
+tests/                    pytest suite, mirrors src/bastion structure —
                            framework integration tests run against the real
                            installed package, never a mock of its API
 dashboard/                Next.js + Postgres app; see dashboard/README.md
@@ -63,7 +63,7 @@ dashboard/                Next.js + Postgres app; see dashboard/README.md
 ```
 
 When adding a new framework integration:
-1. It goes under `src/agentguard/integrations/<framework>.py` and imports
+1. It goes under `src/bastion/integrations/<framework>.py` and imports
    the framework lazily inside the function (see `integrations/langgraph.py`)
    so the core package has zero hard dependency on it — the framework
    stays an optional extra in `pyproject.toml`.

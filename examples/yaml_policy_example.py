@@ -5,8 +5,8 @@ Run: python examples/yaml_policy_example.py
 
 from pathlib import Path
 
-from agentguard import AuditLogger, guard, load_policy_from_yaml
-from agentguard.guard import BlockedByPolicy
+from bastion import AuditLogger, guard, load_policy_from_yaml
+from bastion.guard import BlockedByPolicy
 
 
 def delete_database(table_name: str) -> str:

@@ -1,6 +1,6 @@
 import pytest
 
-from agentguard.scanning import (
+from bastion.scanning import (
     SensitiveContentBlocked,
     contains_pii,
     enforce_text_policy,

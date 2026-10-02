@@ -7,7 +7,7 @@ because buttons require a webhook server running somewhere to receive the
 click payload — reaction polling needs only a bot token, so it works from
 a plain script with no server to host.
 
-Requires the `slack` extra: pip install agentguard[slack]
+Requires the `slack` extra: pip install bastion[slack]
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from agentguard.approval import ApprovalHandler
+from bastion.approval import ApprovalHandler
 
 
 class SlackApprovalHandler(ApprovalHandler):
@@ -41,7 +41,7 @@ class SlackApprovalHandler(ApprovalHandler):
             except ImportError as e:
                 raise ImportError(
                     "slack_sdk is required for SlackApprovalHandler. "
-                    "Install with: pip install agentguard[slack]"
+                    "Install with: pip install bastion[slack]"
                 ) from e
             client = WebClient(token=token)
 

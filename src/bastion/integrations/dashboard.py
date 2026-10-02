@@ -1,5 +1,5 @@
 """Dashboard integration: ship audit events and route approvals through the
-agentguard dashboard's HTTP API instead of a local JSONL file / Slack.
+bastion dashboard's HTTP API instead of a local JSONL file / Slack.
 
 Uses only the standard library (urllib) - no extra dependency required to
 talk to the dashboard. The dashboard's /api/* routes require an API key
@@ -14,10 +14,10 @@ import time
 import urllib.request
 from typing import Any
 
-from agentguard.approval import ApprovalHandler
-from agentguard.audit import AuditEvent, Sink
-from agentguard.config import policy_from_yaml_string
-from agentguard.policy import PolicyEngine
+from bastion.approval import ApprovalHandler
+from bastion.audit import AuditEvent, Sink
+from bastion.config import policy_from_yaml_string
+from bastion.policy import PolicyEngine
 
 
 def _post_json(url: str, payload: dict[str, Any], api_key: str) -> dict[str, Any]:

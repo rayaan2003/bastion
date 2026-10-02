@@ -12,9 +12,9 @@ agents = pytest.importorskip("agents")
 from agents import function_tool  # noqa: E402
 from agents.tool_context import ToolContext  # noqa: E402
 
-from agentguard import Action, AuditLogger, PolicyEngine, Rule  # noqa: E402
-from agentguard.approval import ApprovalHandler  # noqa: E402
-from agentguard.integrations.openai_agents import guarded_tools  # noqa: E402
+from bastion import Action, AuditLogger, PolicyEngine, Rule  # noqa: E402
+from bastion.approval import ApprovalHandler  # noqa: E402
+from bastion.integrations.openai_agents import guarded_tools  # noqa: E402
 
 
 class AlwaysApprove(ApprovalHandler):

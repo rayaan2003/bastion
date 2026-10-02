@@ -33,7 +33,7 @@ export default async function PolicyPage({
     <div className="max-w-3xl mx-auto">
       <h1 className="text-xl font-semibold mb-1">Policy</h1>
       <p className="text-neutral-500 text-sm mb-4">
-        This is what agentguard&apos;s SDK loads via{" "}
+        This is what bastion&apos;s SDK loads via{" "}
         <code className="text-neutral-400">load_policy_from_dashboard()</code>. See{" "}
         <code className="text-neutral-400">examples/policy.yaml</code> in the repo for the
         full rule schema.

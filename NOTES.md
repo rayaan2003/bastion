@@ -95,7 +95,7 @@ Async log shipped to backend -> Dashboard (Next.js + Postgres)
   not Railway — the Railway account's free-plan resource limit was already
   used by an unrelated existing project (`nexus`), and upgrading billing
   wasn't something to decide on the user's behalf.
-- 2026-10-02: Dashboard deployed live — https://agentguard-dashboard-nine.vercel.app
+- 2026-10-02: Dashboard deployed live — https://bastion-dashboard-two.vercel.app
   (Supabase Postgres, transaction pooler connection). See
   dashboard/README.md "Deploying (Vercel)" for the two real gotchas hit
   along the way (Vercel's own auth wall on by default; `echo | vercel env
@@ -104,7 +104,7 @@ Async log shipped to backend -> Dashboard (Next.js + Postgres)
 
 ## Open questions
 
-- Naming for the product/repo — currently using placeholder name `agentguard`
+- Naming for the product/repo — currently using placeholder name `bastion`
   (package + repo), not validated for trademark/domain availability, easy to
   rename before any public launch
 - Where policy config lives long-term (per-project YAML file vs. pulled from

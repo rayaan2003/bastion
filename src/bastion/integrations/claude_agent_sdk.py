@@ -3,8 +3,8 @@
 Usage:
 
     from claude_agent_sdk import ClaudeAgentOptions
-    from agentguard import PolicyEngine, Rule, Action
-    from agentguard.integrations.claude_agent_sdk import guarded_can_use_tool
+    from bastion import PolicyEngine, Rule, Action
+    from bastion.integrations.claude_agent_sdk import guarded_can_use_tool
 
     policy = PolicyEngine()
     policy.add_rule(Rule(tool_pattern="Bash", action=Action.BLOCK, reason="no shell access"))
@@ -19,17 +19,17 @@ per-tool; one callback covers everything. (The SDK only invokes
 `can_use_tool` according to its own `permission_mode` semantics — consult
 the SDK's docs for how that interacts with built-in auto-allow rules.)
 
-Requires the `claude-agent-sdk` extra: pip install agentguard[claude-agent-sdk]
+Requires the `claude-agent-sdk` extra: pip install bastion[claude-agent-sdk]
 """
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from agentguard.approval import ApprovalHandler, ConsoleApprovalHandler
-from agentguard.audit import AuditLogger
-from agentguard.guard import evaluate_and_record
-from agentguard.policy import PolicyEngine
+from bastion.approval import ApprovalHandler, ConsoleApprovalHandler
+from bastion.audit import AuditLogger
+from bastion.guard import evaluate_and_record
+from bastion.policy import PolicyEngine
 
 if TYPE_CHECKING:
     from claude_agent_sdk import CanUseTool, ToolPermissionContext
@@ -47,7 +47,7 @@ def guarded_can_use_tool(
     except ImportError as e:
         raise ImportError(
             "claude-agent-sdk is required for this integration. "
-            "Install with: pip install agentguard[claude-agent-sdk]"
+            "Install with: pip install bastion[claude-agent-sdk]"
         ) from e
 
     audit = audit or AuditLogger()
@@ -61,6 +61,6 @@ def guarded_can_use_tool(
         )
         if allowed:
             return PermissionResultAllow()
-        return PermissionResultDeny(message=f"Blocked by agentguard policy: {reason}")
+        return PermissionResultDeny(message=f"Blocked by bastion policy: {reason}")
 
     return can_use_tool

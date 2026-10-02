@@ -1,9 +1,9 @@
 import pytest
 
-from agentguard import Action, AuditLogger, PolicyEngine, Rule, guard
-from agentguard.approval import ApprovalHandler
-from agentguard.guard import BlockedByPolicy
-from agentguard.policy import any_arg_contains, arg_exceeds
+from bastion import Action, AuditLogger, PolicyEngine, Rule, guard
+from bastion.approval import ApprovalHandler
+from bastion.guard import BlockedByPolicy
+from bastion.policy import any_arg_contains, arg_exceeds
 
 
 def make_audit(tmp_path):

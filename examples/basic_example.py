@@ -3,10 +3,10 @@
 Run: python examples/basic_example.py
 """
 
-from agentguard import Action, AuditLogger, PolicyEngine, Rule, guard
-from agentguard.approval import ConsoleApprovalHandler
-from agentguard.guard import BlockedByPolicy
-from agentguard.policy import arg_exceeds
+from bastion import Action, AuditLogger, PolicyEngine, Rule, guard
+from bastion.approval import ConsoleApprovalHandler
+from bastion.guard import BlockedByPolicy
+from bastion.policy import arg_exceeds
 
 
 def send_email(to: str, subject: str, body: str) -> str:

@@ -1,6 +1,6 @@
 """OpenAI Agents SDK demo — guarded tools wired into an Agent.
 
-Requires: pip install agentguard[openai-agents]
+Requires: pip install bastion[openai-agents]
 
 Running the full agent loop needs an OpenAI API key (Runner.run calls the
 model). This script shows the wiring; see tests/test_openai_agents_integration.py
@@ -12,9 +12,9 @@ Run: python examples/openai_agents_demo.py
 
 from agents import Agent, function_tool
 
-from agentguard import Action, AuditLogger, PolicyEngine, Rule
-from agentguard.integrations.openai_agents import guarded_tools
-from agentguard.policy import any_arg_contains
+from bastion import Action, AuditLogger, PolicyEngine, Rule
+from bastion.integrations.openai_agents import guarded_tools
+from bastion.policy import any_arg_contains
 
 
 @function_tool

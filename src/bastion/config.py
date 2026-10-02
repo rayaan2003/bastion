@@ -27,7 +27,7 @@ from typing import Any
 
 import yaml
 
-from agentguard.policy import (
+from bastion.policy import (
     Action,
     PolicyEngine,
     Rule,
@@ -35,7 +35,7 @@ from agentguard.policy import (
     arg_exceeds,
     arg_matches_regex,
 )
-from agentguard.scanning import contains_pii
+from bastion.scanning import contains_pii
 
 Condition = Callable[[dict[str, Any]], bool]
 _ConditionBuilder = Callable[[dict[str, Any]], Condition]

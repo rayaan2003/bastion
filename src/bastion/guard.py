@@ -2,7 +2,7 @@
 before it actually executes.
 
 This is framework-agnostic: any Python callable works. Framework-specific
-helpers (e.g. for LangGraph tool objects) live in agentguard.integrations.*
+helpers (e.g. for LangGraph tool objects) live in bastion.integrations.*
 and call back into `guard()`.
 """
 
@@ -13,9 +13,9 @@ import inspect
 from collections.abc import Callable, Iterable
 from typing import Any
 
-from agentguard.approval import ApprovalHandler, ConsoleApprovalHandler
-from agentguard.audit import AuditLogger
-from agentguard.policy import Action, PolicyEngine
+from bastion.approval import ApprovalHandler, ConsoleApprovalHandler
+from bastion.audit import AuditLogger
+from bastion.policy import Action, PolicyEngine
 
 
 class BlockedByPolicy(Exception):

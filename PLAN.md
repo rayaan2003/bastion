@@ -115,7 +115,7 @@ Built and verified (tests passing, demo run end-to-end):
     Approve/Deny buttons call), confirmed it left the pending list, and
     confirmed a second decision attempt on an already-decided approval is
     correctly rejected (404) rather than silently overwriting
-- `src/agentguard/integrations/dashboard.py` — `dashboard_audit_sink()` (an
+- `src/bastion/integrations/dashboard.py` — `dashboard_audit_sink()` (an
   `AuditLogger` sink that POSTs to `/api/events` instead of writing JSONL)
   and `DashboardApprovalHandler` (creates a pending approval via the API,
   polls until a reviewer decides it on `/approvals`, fails closed/denies on
@@ -165,7 +165,7 @@ two independent mechanisms, deliberately not shared:
 
 ### Live deployment (2026-10-02)
 
-Dashboard deployed to Vercel: **https://agentguard-dashboard-nine.vercel.app**
+Dashboard deployed to Vercel: **https://bastion-dashboard-two.vercel.app**
 Database: Supabase Postgres (transaction pooler connection, required — direct
 connections are IPv6-only and unreachable from Vercel's serverless runtime).
 
@@ -200,12 +200,12 @@ wired all the way through:
 - `POST /policy/save` (session-protected route, not under `/api/*` since
   it's a human form submission, not the SDK) — validates YAML *syntax*
   only (`js-yaml`); deeper rule validation (unknown condition type, missing
-  fields) deliberately stays Python-side in `agentguard.config`, same as
+  fields) deliberately stays Python-side in `bastion.config`, same as
   it always worked for a local file — not worth duplicating that schema
   logic in TypeScript
-- Python: `agentguard.config.policy_from_yaml_string()` (extracted from
+- Python: `bastion.config.policy_from_yaml_string()` (extracted from
   `load_policy_from_yaml` for reuse) and
-  `agentguard.integrations.dashboard.load_policy_from_dashboard()`
+  `bastion.integrations.dashboard.load_policy_from_dashboard()`
 - 6 new/updated tests (39 total Python tests passing)
 - Verified the **entire chain for real**, not just each piece in
   isolation: submitted a rule through the actual `/policy` form → saved to
@@ -217,7 +217,7 @@ wired all the way through:
 
 ### OpenAI Agents SDK integration (2026-10-02)
 
-`src/agentguard/integrations/openai_agents.py` — `guarded_tools()` wraps
+`src/bastion/integrations/openai_agents.py` — `guarded_tools()` wraps
 `agents.FunctionTool` objects (the `@function_tool` decorator's output).
 
 - Extracted `evaluate_and_record()` out of `guard.py` first — the policy
@@ -260,7 +260,7 @@ wired all the way through:
 
 ### Claude Agent SDK integration (2026-10-02)
 
-`src/agentguard/integrations/claude_agent_sdk.py` —
+`src/bastion/integrations/claude_agent_sdk.py` —
 `guarded_can_use_tool()`, a `can_use_tool` callback for `ClaudeAgentOptions`.
 
 - This integration point is structurally different from (and simpler than)

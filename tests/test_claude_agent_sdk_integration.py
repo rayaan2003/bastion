@@ -15,9 +15,9 @@ from claude_agent_sdk import (  # noqa: E402
     ToolPermissionContext,
 )
 
-from agentguard import Action, AuditLogger, PolicyEngine, Rule  # noqa: E402
-from agentguard.approval import ApprovalHandler  # noqa: E402
-from agentguard.integrations.claude_agent_sdk import guarded_can_use_tool  # noqa: E402
+from bastion import Action, AuditLogger, PolicyEngine, Rule  # noqa: E402
+from bastion.approval import ApprovalHandler  # noqa: E402
+from bastion.integrations.claude_agent_sdk import guarded_can_use_tool  # noqa: E402
 
 
 class AlwaysApprove(ApprovalHandler):

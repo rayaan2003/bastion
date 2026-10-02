@@ -1,6 +1,6 @@
 from typing import Any
 
-from agentguard.integrations.slack import SlackApprovalHandler
+from bastion.integrations.slack import SlackApprovalHandler
 
 
 class FakeSlackClient:
