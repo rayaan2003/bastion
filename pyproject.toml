@@ -5,9 +5,38 @@ description = "Runtime policy enforcement for AI agent tool calls — block, app
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
+authors = [{ name = "Rayaan Sheikh", email = "rayaansheikh442@gmail.com" }]
+keywords = [
+    "ai-safety",
+    "ai-agents",
+    "llm",
+    "guardrails",
+    "langgraph",
+    "security",
+    "compliance",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
+]
 dependencies = [
     "PyYAML>=6.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/rayaan2003/agentguard"
+Repository = "https://github.com/rayaan2003/agentguard"
+Issues = "https://github.com/rayaan2003/agentguard/issues"
+Changelog = "https://github.com/rayaan2003/agentguard/blob/master/CHANGELOG.md"
 
 [project.optional-dependencies]
 claude-agent-sdk = ["claude-agent-sdk>=0.1"]
