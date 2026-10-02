@@ -4,7 +4,8 @@ version = "0.1.0"
 description = "Runtime policy enforcement for AI agent tool calls — block, approve, or log unsafe actions before they execute."
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "Apache-2.0" }
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 authors = [{ name = "Rayaan Sheikh", email = "rayaansheikh442@gmail.com" }]
 keywords = [
     "ai-safety",
@@ -18,7 +19,6 @@ keywords = [
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
@@ -46,7 +46,7 @@ slack = ["slack_sdk>=3.27"]
 dev = ["pytest>=8.0", "ruff>=0.6", "mypy>=1.11", "types-PyYAML>=6.0"]
 
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]

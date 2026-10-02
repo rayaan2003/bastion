@@ -3,10 +3,9 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
-## [Unreleased]
+## [0.1.0] - 2026-10-02
 
-Pre-1.0 — still pre-PyPI-publish. Nothing released yet; this tracks
-what's shipped on `master`.
+First published release.
 
 ### Added
 
@@ -44,4 +43,4 @@ what's shipped on `master`.
 - Production tooling from day one: `ruff`, `mypy --strict`, `pytest`,
   GitHub Actions CI.
 
-[Unreleased]: https://github.com/rayaan2003/bastion/compare/7570dc8...HEAD
+[0.1.0]: https://github.com/rayaan2003/bastion/releases/tag/v0.1.0
