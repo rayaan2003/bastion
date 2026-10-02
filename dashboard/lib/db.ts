@@ -1,27 +1,30 @@
-import { PGlite } from "@electric-sql/pglite";
+import { Pool } from "pg";
 import fs from "node:fs";
 import path from "node:path";
 
-// Embedded Postgres (PGlite), file-persisted under ./data. This is a
-// deliberate v1 choice to avoid requiring a hosted Postgres instance before
-// there are real users — see NOTES.md in the repo root. Swap for a real
-// Postgres connection (e.g. via `pg`) once concurrent multi-instance access
-// matters; the SQL in schema.sql and the query() call sites don't change.
+// Real Postgres via DATABASE_URL. v1 ran on PGlite (embedded WASM Postgres)
+// to avoid standing up a database before there were real users - this
+// swaps to a real connection now that the dashboard is being deployed
+// somewhere reachable, where PGlite's single-process limitation (no
+// concurrent writers) would actually matter. See NOTES.md.
 
 declare global {
-  var __agentguardDb: Promise<PGlite> | undefined;
+  var __agentguardDb: Promise<Pool> | undefined;
 }
 
-async function createDb(): Promise<PGlite> {
-  const dataDir = path.join(process.cwd(), "data", "pgdata");
-  fs.mkdirSync(dataDir, { recursive: true });
-  const db = new PGlite(dataDir);
+async function createDb(): Promise<Pool> {
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    throw new Error("DATABASE_URL environment variable is required");
+  }
+
+  const pool = new Pool({ connectionString });
   const schema = fs.readFileSync(path.join(process.cwd(), "lib", "schema.sql"), "utf-8");
-  await db.exec(schema);
-  return db;
+  await pool.query(schema);
+  return pool;
 }
 
-export function getDb(): Promise<PGlite> {
+export function getDb(): Promise<Pool> {
   if (!global.__agentguardDb) {
     global.__agentguardDb = createDb();
   }

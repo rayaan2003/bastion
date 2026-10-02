@@ -37,8 +37,6 @@ yarn-error.log*
 # vercel
 .vercel
 
-# embedded Postgres data (PGlite) - local dev only, never commit
-/data/
 
 # typescript
 *.tsbuildinfo

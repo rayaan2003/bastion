@@ -87,6 +87,14 @@ Async log shipped to backend -> Dashboard (Next.js + Postgres)
   immediately and fixed same session rather than deferred. Two separate
   mechanisms (human session login vs. SDK API key) rather than one, because
   the Python SDK has no browser session to authenticate with.
+- 2026-10-02: Swapped PGlite for real Postgres (`pg` + `DATABASE_URL`)
+  ahead of public deployment — this was the planned upgrade trigger
+  ("revisit when concurrent multi-instance access matters") and deploying
+  somewhere reachable is exactly that point.
+- 2026-10-02: Deploy target = Vercel (dashboard) + Neon/Supabase (Postgres),
+  not Railway — the Railway account's free-plan resource limit was already
+  used by an unrelated existing project (`nexus`), and upgrading billing
+  wasn't something to decide on the user's behalf.
 
 ## Open questions
 

@@ -56,12 +56,17 @@ class _FakeDashboardServer:
                 return self.headers.get("Authorization") == f"Bearer {_API_KEY}"
 
             def do_POST(self):
+                # Always drain the request body first, even when rejecting
+                # the request - closing the connection while the client is
+                # still writing it can abort the socket on Windows.
+                length = int(self.headers.get("Content-Length", 0))
+                raw_body = self.rfile.read(length) or b"{}"
+
                 if not self._authorized():
                     self._send_json(401, {"error": "unauthorized"})
                     return
 
-                length = int(self.headers.get("Content-Length", 0))
-                body = json.loads(self.rfile.read(length) or b"{}")
+                body = json.loads(raw_body)
 
                 if self.path == "/api/events":
                     server.received_events.append(body)
