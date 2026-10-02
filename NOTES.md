@@ -95,6 +95,12 @@ Async log shipped to backend -> Dashboard (Next.js + Postgres)
   not Railway — the Railway account's free-plan resource limit was already
   used by an unrelated existing project (`nexus`), and upgrading billing
   wasn't something to decide on the user's behalf.
+- 2026-10-02: Dashboard deployed live — https://agentguard-dashboard-nine.vercel.app
+  (Supabase Postgres, transaction pooler connection). See
+  dashboard/README.md "Deploying (Vercel)" for the two real gotchas hit
+  along the way (Vercel's own auth wall on by default; `echo | vercel env
+  add` silently corrupting secrets with a trailing newline) so they don't
+  get re-discovered from scratch next time.
 
 ## Open questions
 

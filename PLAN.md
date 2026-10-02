@@ -163,6 +163,30 @@ two independent mechanisms, deliberately not shared:
   while approving it via the API mid-poll — confirmed it returns `True`
   exactly when expected, not just that it doesn't crash.
 
+### Live deployment (2026-10-02)
+
+Dashboard deployed to Vercel: **https://agentguard-dashboard-nine.vercel.app**
+Database: Supabase Postgres (transaction pooler connection, required — direct
+connections are IPv6-only and unreachable from Vercel's serverless runtime).
+
+Setup notes for next time:
+- Vercel's own "Vercel Authentication" deployment protection is on by
+  default for new projects and puts *Vercel's* login wall in front of
+  everything, before our app's own `/login` is ever reached. Had to be
+  turned off in Project Settings → Deployment Protection.
+- `echo "value" | vercel env add KEY production` silently stores a trailing
+  newline as part of the secret (from `echo`'s own newline) — broke
+  password, session-secret, and API-key comparisons in a way that failed
+  confusingly (login *looked* like it succeeded by status code alone,
+  because both the success and failure paths return 303 — only the
+  `Location` header differs). Fixed by using `printf '%s'` instead of
+  `echo`, which doesn't add a trailing newline. Verified by pulling the
+  env vars back down and checking exact byte lengths before redeploying.
+- Verified the fix against the live production URL end to end (not just
+  "build succeeded"): login, session cookie, API key accept/reject, and
+  a real Python SDK call through `dashboard_audit_sink` all the way to
+  the rendered `/audit` page.
+
 ## Next up, in order
 
 1. **Policy config editor in the dashboard.** Currently the dashboard only

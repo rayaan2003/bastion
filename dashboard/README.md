@@ -9,18 +9,26 @@ Audit log viewer and human-approval queue for the `agentguard` Python SDK
 - **`/approvals`** — the live queue of actions waiting on a human reviewer,
   with Approve/Deny buttons.
 
+## Live deployment
+
+https://agentguard-dashboard-nine.vercel.app (Vercel + Supabase Postgres)
+
 ## Database
 
-Uses [PGlite](https://pglite.dev) — a real Postgres compiled to WASM,
-embedded in the Node process and file-persisted under `./data/pgdata`
-(gitignored). This is a deliberate v1 choice: no external Postgres instance
-to stand up before there are real users. It does **not** support concurrent
-writers from multiple processes — swap `lib/db.ts` for a real Postgres
-connection (e.g. via `pg`, pointed at a hosted instance) once that matters.
-See `NOTES.md` at the repo root for the full reasoning.
+Real Postgres via `DATABASE_URL` (see `lib/db.ts`). In production this is
+Supabase — use the **transaction pooler** connection string, not the direct
+one: Supabase's direct connections are IPv6-only, which Vercel's serverless
+functions can't reach. The pooler string looks like
+`postgresql://postgres.<project-ref>:<password>@aws-0-<region>.pooler.supabase.com:6543/postgres`.
 
 Schema lives in `lib/schema.sql` and is applied (idempotently) on startup —
 no separate migration step at this scale.
+
+(v1 ran on PGlite, an embedded WASM Postgres, to avoid standing up a
+database before there were real users. Swapped to real Postgres once the
+dashboard was actually being deployed somewhere reachable — PGlite doesn't
+support concurrent writers from multiple processes. See `NOTES.md` at the
+repo root.)
 
 ## Auth
 
@@ -28,8 +36,8 @@ Two separate mechanisms, deliberately not shared:
 
 - **Human login** (`/login`) — a single shared password (`DASHBOARD_PASSWORD`),
   sets a signed, httpOnly session cookie (`DASHBOARD_SESSION_SECRET`) via
-  middleware that gates `/`, `/audit`, and `/approvals`. Sign out from the
-  nav bar.
+  `proxy.ts` (Next.js's middleware convention) that gates `/`, `/audit`, and
+  `/approvals`. Sign out from the nav bar.
 - **SDK API key** (`DASHBOARD_API_KEY`) — every `/api/*` route requires
   `Authorization: Bearer <key>`. This is what the Python SDK sends; it has
   no browser session, so it can't use the login cookie.
@@ -42,11 +50,40 @@ anything beyond a quick look at the UI with no backing data.
 
 ```bash
 npm install
-cp .env.example .env.local   # then edit in real secrets
+cp .env.example .env.local   # then edit in real secrets, including DATABASE_URL
 npm run dev
 ```
 
 Opens at http://localhost:3000, redirects to `/login` until you sign in.
+
+## Deploying (Vercel)
+
+```bash
+vercel link
+vercel env add DATABASE_URL production            # paste value, do NOT pipe via `echo` - see gotcha below
+vercel env add DASHBOARD_PASSWORD production
+vercel env add DASHBOARD_SESSION_SECRET production
+vercel env add DASHBOARD_API_KEY production
+vercel --prod
+```
+
+Two gotchas hit during the first deploy, worth knowing before you hit them
+again:
+
+1. **Vercel's own "Vercel Authentication" deployment protection** is on by
+   default for new projects and puts *Vercel's* login wall in front of
+   everything — before our app's `/login` is ever reached. Turn it off in
+   the Vercel dashboard: Project Settings → Deployment Protection →
+   "Require Log In" → off.
+2. **Never pipe env var values through `echo`**: `echo "value" | vercel env
+   add KEY production` stores `echo`'s trailing newline as part of the
+   secret, which silently breaks every comparison against it (password
+   check, API key check, session signing/verification) without an obvious
+   error — the login route still returns a 303 either way, so check the
+   `Location` header, not just the status code, if this bites you. Use
+   `printf '%s' "value" | vercel env add KEY production` instead (no
+   trailing newline). If in doubt, `vercel env pull` and check the exact
+   byte length of the value.
 
 ## Wiring up the Python SDK
 

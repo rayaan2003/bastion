@@ -10,3 +10,4 @@ dist/
 .mypy_cache/
 *.jsonl
 .env
+dash.txt
