@@ -100,6 +100,20 @@ A blocked or approval-denied call comes back as a normal error `ToolMessage`
 (`handle_tool_errors=BlockedByPolicy`), so the agent can react to it instead
 of the graph run crashing. See `examples/langgraph_demo.py`.
 
+## OpenAI Agents SDK integration
+
+```python
+from agentguard.integrations.openai_agents import guarded_tools
+
+agent = Agent(name="...", tools=guarded_tools([my_tool_a, my_tool_b], policy=policy))
+```
+
+A blocked or approval-denied call returns a descriptive string as the
+tool's result (`"Tool call blocked by policy: <reason>"`) rather than
+raising — the same idiom the SDK itself uses when a tool raises an
+exception, so the model sees why and can react. See
+`examples/openai_agents_demo.py`.
+
 ## Slack approval
 
 ```python

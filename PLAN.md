@@ -215,13 +215,58 @@ wired all the way through:
   rejected before touching the database (confirmed the prior valid policy
   was untouched after a bad submission).
 
+### OpenAI Agents SDK integration (2026-10-02)
+
+`src/agentguard/integrations/openai_agents.py` — `guarded_tools()` wraps
+`agents.FunctionTool` objects (the `@function_tool` decorator's output).
+
+- Extracted `evaluate_and_record()` out of `guard.py` first — the policy
+  evaluation / approval-handler / audit-recording logic is now in exactly
+  one place, shared by `guard()` and every framework integration that
+  needs it, instead of duplicating that glue three times. Verified the
+  refactor didn't change behavior: full suite green before and after.
+- Inspected the real, installed package to design against its actual
+  current API rather than a remembered/guessed one (`FunctionTool` is a
+  (non-frozen) dataclass; `on_invoke_tool(ctx, input: str) -> Awaitable[Any]`
+  takes JSON-string args, not kwargs; confirmed via `dataclasses.replace`
+  that wrapping doesn't require mutating the caller's original tool).
+- A blocked/denied call returns a descriptive string result
+  (`"Tool call blocked by policy: <reason>"`) instead of raising —
+  confirmed by testing that a tool which raises an exception gets
+  converted by the SDK's own `@function_tool` wrapper into a generic
+  `"An error occurred..."` string with no detail, so replicating that
+  exact behavior for policy blocks would have thrown away the reason the
+  model most needs to see.
+- Known, documented limitation: `ApprovalHandler.request_approval` is
+  synchronous (shared interface with console/Slack/dashboard handlers);
+  since tool invocation here is async, an approval wait blocks the event
+  loop for its duration. Fine for a single agent run, worth knowing for
+  many concurrent agents on one loop — not fixing this now since none of
+  the other integrations need true async either.
+- 7 new tests (46 total) run against the real installed `agents` package
+  (not a mock) — direct invocation via a real `ToolContext`, the same
+  mechanism the SDK's own `Runner` uses internally. Covers allow, block,
+  approve+approved, approve+denied, confirms the original tool object is
+  never mutated, and confirms the audit log actually records the block.
+- Also verified the package degrades correctly with `openai-agents`
+  *not* installed: uninstalled it, confirmed `ruff`/`mypy`/`pytest` all
+  still pass clean (the 7 new tests skip via `pytest.importorskip`, same
+  pattern proven for the Slack integration), then reinstalled and
+  reverified full-green with it present.
+- `examples/openai_agents_demo.py` — verified it actually runs (builds a
+  real `Agent` with 3 guarded tools). Executing the full `Runner.run()`
+  loop needs an OpenAI API key, so that part is covered by the test
+  suite's direct-invocation tests instead, not this example.
+
 ## Next up, in order
 
-1. **Ship v1 publicly.** OSS SDK on GitHub/PyPI + hosted dashboard waitlist.
+1. **Claude Agent SDK integration**, same rigor as above: inspect the
+   real installed package's current tool-definition API before writing
+   against it, verify with tests against the real package (not mocked),
+   check optional-import degradation.
+2. **Ship v1 publicly.** OSS SDK on GitHub/PyPI + hosted dashboard waitlist.
    Get 5-10 real teams to install it before iterating further — see GTM
-   notes in NOTES.md. This is the actual next priority over further
-   features — the MVP scope from this file is now fully built, including
-   the policy editor.
+   notes in NOTES.md.
 
 ## Definition of done (every item above)
 

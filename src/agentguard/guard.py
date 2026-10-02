@@ -25,6 +25,43 @@ class BlockedByPolicy(Exception):
         super().__init__(f"Tool call '{tool_name}' blocked by policy: {reason}")
 
 
+def evaluate_and_record(
+    tool_name: str,
+    args: dict[str, Any],
+    *,
+    policy: PolicyEngine,
+    audit: AuditLogger,
+    approval_handler: ApprovalHandler,
+) -> tuple[bool, str]:
+    """Evaluate policy for a tool call, consult the approval handler if the
+    rule says to, and record the outcome to the audit log either way.
+
+    Returns (allowed, reason). Shared by `guard()` and the framework
+    integrations (LangGraph wraps tools directly so doesn't need this;
+    OpenAI Agents SDK and Claude Agent SDK do) so the actual policy/audit/
+    approval logic lives in exactly one place. What happens when not
+    allowed — raise, return an error string, etc. — differs per framework,
+    so that decision is left to the caller.
+    """
+    decision = policy.evaluate(tool_name, args)
+
+    if decision.action == Action.BLOCK:
+        audit.record(tool_name, args, "blocked", decision.reason)
+        return False, decision.reason
+
+    if decision.action == Action.APPROVE:
+        approved = approval_handler.request_approval(tool_name, args, decision.reason)
+        if not approved:
+            reason = f"approval denied ({decision.reason})"
+            audit.record(tool_name, args, "denied", decision.reason)
+            return False, reason
+        audit.record(tool_name, args, "approved", decision.reason)
+        return True, decision.reason
+
+    audit.record(tool_name, args, "allowed", decision.reason)
+    return True, decision.reason
+
+
 def guard(
     fn: Callable[..., Any],
     *,
@@ -47,21 +84,11 @@ def guard(
     @functools.wraps(fn)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
         call_args = _build_args_dict(fn, args, kwargs)
-        decision = policy.evaluate(name, call_args)
-
-        if decision.action == Action.BLOCK:
-            audit.record(name, call_args, "blocked", decision.reason)
-            raise BlockedByPolicy(name, decision.reason)
-
-        if decision.action == Action.APPROVE:
-            approved = approval_handler.request_approval(name, call_args, decision.reason)
-            if not approved:
-                audit.record(name, call_args, "denied", decision.reason)
-                raise BlockedByPolicy(name, f"approval denied ({decision.reason})")
-            audit.record(name, call_args, "approved", decision.reason)
-            return fn(*args, **kwargs)
-
-        audit.record(name, call_args, "allowed", decision.reason)
+        allowed, reason = evaluate_and_record(
+            name, call_args, policy=policy, audit=audit, approval_handler=approval_handler
+        )
+        if not allowed:
+            raise BlockedByPolicy(name, reason)
         return fn(*args, **kwargs)
 
     return wrapper
