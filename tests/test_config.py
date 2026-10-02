@@ -1,7 +1,7 @@
 import pytest
 
 from agentguard import Action, PolicyConfigError, load_policy_from_yaml
-from agentguard.config import policy_from_dict
+from agentguard.config import policy_from_dict, policy_from_yaml_string
 from agentguard.guard import BlockedByPolicy, guard
 
 
@@ -106,5 +106,26 @@ def test_condition_missing_field_raises():
 
 def test_empty_config_is_default_allow():
     policy = policy_from_dict({})
+    decision = policy.evaluate("anything", {})
+    assert decision.action == Action.ALLOW
+
+
+def test_policy_from_yaml_string_matches_file_loading():
+    yaml_text = """
+default_action: allow
+rules:
+  - name: block-deletes
+    tool: "delete_*"
+    action: block
+    reason: "irreversible action"
+"""
+    policy = policy_from_yaml_string(yaml_text)
+    decision = policy.evaluate("delete_user", {})
+    assert decision.action == Action.BLOCK
+    assert decision.reason == "irreversible action"
+
+
+def test_policy_from_yaml_string_empty_text_is_default_allow():
+    policy = policy_from_yaml_string("")
     decision = policy.evaluate("anything", {})
     assert decision.action == Action.ALLOW

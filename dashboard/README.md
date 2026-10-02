@@ -8,6 +8,11 @@ Audit log viewer and human-approval queue for the `agentguard` Python SDK
   session id.
 - **`/approvals`** — the live queue of actions waiting on a human reviewer,
   with Approve/Deny buttons.
+- **`/policy`** — edit the policy YAML the SDK enforces, instead of hand-
+  editing a local `policy.yaml` file. Validates YAML syntax on save;
+  deeper rule validation (unknown condition type, missing fields) happens
+  Python-side when the SDK loads it, same as it always did for a local
+  file. Every save is kept (append-only version history), not overwritten.
 
 ## Live deployment
 
@@ -89,14 +94,22 @@ again:
 
 ```python
 from agentguard import AuditLogger, guard
-from agentguard.integrations.dashboard import DashboardApprovalHandler, dashboard_audit_sink
+from agentguard.integrations.dashboard import (
+    DashboardApprovalHandler,
+    dashboard_audit_sink,
+    load_policy_from_dashboard,
+)
 
 api_key = "..."  # must match DASHBOARD_API_KEY in the dashboard's env
+policy = load_policy_from_dashboard("http://localhost:3000", api_key)
 audit = AuditLogger(sink=dashboard_audit_sink("http://localhost:3000", api_key))
 approval_handler = DashboardApprovalHandler("http://localhost:3000", api_key)
 
 guarded_fn = guard(my_tool, policy=policy, audit=audit, approval_handler=approval_handler)
 ```
+
+`load_policy_from_dashboard()` fetches once at call time — call it again
+(e.g. on a timer) to pick up edits made after the agent process started.
 
 A blocked-pending-approval call creates a row on `/approvals`; the SDK polls
 until a reviewer clicks Approve/Deny there (or the call times out and fails

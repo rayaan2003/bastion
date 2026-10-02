@@ -18,5 +18,5 @@ export async function proxy(request: NextRequest) {
 // Python SDK (machine-to-machine) and are protected separately by
 // requireApiKey() in lib/credentials.ts, not by the browser session cookie.
 export const config = {
-  matcher: ["/", "/audit/:path*", "/approvals/:path*"],
+  matcher: ["/", "/audit/:path*", "/approvals/:path*", "/policy/:path*"],
 };

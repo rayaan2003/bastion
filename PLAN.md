@@ -187,16 +187,41 @@ Setup notes for next time:
   a real Python SDK call through `dashboard_audit_sink` all the way to
   the rendered `/audit` page.
 
+### Policy config editor (2026-10-02)
+
+Added a `/policy` page (session-protected) where a reviewer edits the
+policy YAML the SDK actually enforces — not just a local text editor, it's
+wired all the way through:
+
+- `dashboard/lib/policy.ts` — append-only `policy_versions` table (every
+  save kept, not overwritten — a free history of policy changes, matching
+  the audit-trail ethos of the rest of the product)
+- `GET /api/policy` (API-key protected) — what the SDK fetches
+- `POST /policy/save` (session-protected route, not under `/api/*` since
+  it's a human form submission, not the SDK) — validates YAML *syntax*
+  only (`js-yaml`); deeper rule validation (unknown condition type, missing
+  fields) deliberately stays Python-side in `agentguard.config`, same as
+  it always worked for a local file — not worth duplicating that schema
+  logic in TypeScript
+- Python: `agentguard.config.policy_from_yaml_string()` (extracted from
+  `load_policy_from_yaml` for reuse) and
+  `agentguard.integrations.dashboard.load_policy_from_dashboard()`
+- 6 new/updated tests (39 total Python tests passing)
+- Verified the **entire chain for real**, not just each piece in
+  isolation: submitted a rule through the actual `/policy` form → saved to
+  real Supabase → SDK's `load_policy_from_dashboard()` fetched it → called
+  `guard()` with that policy → the exact tool call got blocked with the
+  exact reason text typed into the browser. Also verified invalid YAML is
+  rejected before touching the database (confirmed the prior valid policy
+  was untouched after a bad submission).
+
 ## Next up, in order
 
-1. **Policy config editor in the dashboard.** Currently the dashboard only
-   shows audit logs and approvals — editing `policy.yaml` still happens by
-   hand. Lower priority than it sounds: the YAML format already makes this
-   readable by a non-engineer without a UI.
-2. **Ship v1 publicly.** OSS SDK on GitHub/PyPI + hosted dashboard waitlist.
+1. **Ship v1 publicly.** OSS SDK on GitHub/PyPI + hosted dashboard waitlist.
    Get 5-10 real teams to install it before iterating further — see GTM
    notes in NOTES.md. This is the actual next priority over further
-   features — the MVP scope from this file is now fully built.
+   features — the MVP scope from this file is now fully built, including
+   the policy editor.
 
 ## Definition of done (every item above)
 

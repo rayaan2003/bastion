@@ -32,6 +32,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <a href="/approvals" className="text-neutral-400 hover:text-neutral-100">
             Approvals
           </a>
+          <a href="/policy" className="text-neutral-400 hover:text-neutral-100">
+            Policy
+          </a>
           <form action="/api/auth/logout" method="post" className="ml-auto">
             <button type="submit" className="text-neutral-400 hover:text-neutral-100">
               Sign out

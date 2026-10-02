@@ -16,6 +16,8 @@ from typing import Any
 
 from agentguard.approval import ApprovalHandler
 from agentguard.audit import AuditEvent, Sink
+from agentguard.config import policy_from_yaml_string
+from agentguard.policy import PolicyEngine
 
 
 def _post_json(url: str, payload: dict[str, Any], api_key: str) -> dict[str, Any]:
@@ -62,6 +64,26 @@ def dashboard_audit_sink(base_url: str, api_key: str) -> Sink:
         )
 
     return sink
+
+
+def load_policy_from_dashboard(base_url: str, api_key: str) -> PolicyEngine:
+    """Fetch the policy currently set on the dashboard's /policy page and
+    build a PolicyEngine from it - lets a reviewer edit rules in the UI
+    instead of hand-editing a local policy.yaml.
+
+        policy = load_policy_from_dashboard("http://localhost:3000", api_key)
+
+    Fetches once at call time; call it again (e.g. on a timer) to pick up
+    edits made after the agent process started. Raises ValueError if no
+    policy has been saved on the dashboard yet.
+    """
+    data = _get_json(f"{base_url.rstrip('/')}/api/policy", api_key)
+    yaml_text = data.get("yaml_text")
+    if not yaml_text:
+        raise ValueError(
+            "dashboard has no policy configured yet - set one at the dashboard's /policy page"
+        )
+    return policy_from_yaml_string(yaml_text)
 
 
 class DashboardApprovalHandler(ApprovalHandler):

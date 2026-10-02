@@ -25,3 +25,11 @@ CREATE TABLE IF NOT EXISTS approval_requests (
 );
 
 CREATE INDEX IF NOT EXISTS idx_approval_requests_status ON approval_requests (status);
+
+CREATE TABLE IF NOT EXISTS policy_versions (
+  id TEXT PRIMARY KEY,
+  yaml_text TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_policy_versions_created_at ON policy_versions (created_at DESC);

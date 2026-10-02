@@ -53,7 +53,11 @@ class PolicyConfigError(Exception):
 
 
 def load_policy_from_yaml(path: str | Path) -> PolicyEngine:
-    raw = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
+    return policy_from_yaml_string(Path(path).read_text(encoding="utf-8"))
+
+
+def policy_from_yaml_string(yaml_text: str) -> PolicyEngine:
+    raw = yaml.safe_load(yaml_text) or {}
     return policy_from_dict(raw)
 
 

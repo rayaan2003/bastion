@@ -6,7 +6,11 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 import pytest
 
 from agentguard.audit import AuditEvent
-from agentguard.integrations.dashboard import DashboardApprovalHandler, dashboard_audit_sink
+from agentguard.integrations.dashboard import (
+    DashboardApprovalHandler,
+    dashboard_audit_sink,
+    load_policy_from_dashboard,
+)
 
 _API_KEY = "test-api-key"
 
@@ -17,11 +21,12 @@ class _FakeDashboardServer:
     real rather than mocked. Enforces the same Bearer API key check as the
     real dashboard's requireApiKey()."""
 
-    def __init__(self, approve_after: int = 1):
+    def __init__(self, approve_after: int = 1, policy_yaml: str | None = None):
         self.received_events: list[dict] = []
         self.approvals: dict[str, dict] = {}
         self.get_counts: dict[str, int] = {}
         self.approve_after = approve_after
+        self.policy_yaml = policy_yaml
 
         handler = self._make_handler()
         self.httpd = HTTPServer(("127.0.0.1", 0), handler)
@@ -95,6 +100,11 @@ class _FakeDashboardServer:
                         server.approvals[approval_id]["status"] = "approved"
                     self._send_json(200, server.approvals[approval_id])
                     return
+
+                if self.path == "/api/policy":
+                    self._send_json(200, {"yaml_text": server.policy_yaml})
+                    return
+
                 self._send_json(404, {"error": "not found"})
 
         return Handler
@@ -158,5 +168,32 @@ def test_dashboard_approval_handler_denies_on_timeout():
         )
         result = handler.request_approval("transfer_funds", {"amount": 600}, "large transfer")
         assert result is False
+    finally:
+        server.shutdown()
+
+
+def test_load_policy_from_dashboard():
+    from agentguard import Action
+
+    server = _FakeDashboardServer(policy_yaml="""
+rules:
+  - name: block-deletes
+    tool: "delete_*"
+    action: block
+    reason: "irreversible"
+""")
+    try:
+        policy = load_policy_from_dashboard(server.base_url, _API_KEY)
+        decision = policy.evaluate("delete_user", {})
+        assert decision.action == Action.BLOCK
+    finally:
+        server.shutdown()
+
+
+def test_load_policy_from_dashboard_raises_when_unset():
+    server = _FakeDashboardServer(policy_yaml=None)
+    try:
+        with pytest.raises(ValueError, match="no policy configured"):
+            load_policy_from_dashboard(server.base_url, _API_KEY)
     finally:
         server.shutdown()
