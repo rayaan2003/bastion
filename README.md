@@ -29,10 +29,10 @@ tool ran." bastion sits in that gap:
  agent decides to call a tool
           │
           ▼
-   ┌─────────────┐      allow  ──▶  tool runs
-   │  bastion │      block  ──▶  denied, agent sees why
-   │ policy check│   approve   ──▶  human reviews (Slack / dashboard / console)
-   └─────────────┘
+    ┌──────────┐      allow    ──▶  tool runs
+    │ bastion  │      block    ──▶  denied, agent sees why
+    │  policy  │      approve  ──▶  human reviews (Slack / dashboard / console)
+    └──────────┘
           │
           ▼
    every decision logged
@@ -51,7 +51,7 @@ actually allowed to **do**.
 | 🔍 **PII/secrets scanning** | Regex-based (no ML model to download) — emails, SSNs, Luhn-validated credit cards, cloud credentials, private keys |
 | 📄 **Declarative policy** | Rules in YAML, editable by a non-engineer reviewer — by hand or from the dashboard's `/policy` page |
 | 🔌 **3 framework integrations** | LangGraph, OpenAI Agents SDK, Claude Agent SDK — one line to wrap your tools |
-| 📊 **Dashboard** | Audit log, approval queue, policy editor — a real Next.js app, not a toy |
+| 📊 **Dashboard** | Audit log, approval queue, and a policy editor — a real Next.js app |
 
 ## Quickstart
 
@@ -82,7 +82,7 @@ guarded(account="acct_1", amount=600)  # prompts for approval in the terminal
 python examples/basic_example.py   # runs the full demo above
 ```
 
-Prefer YAML over hand-written Python rules?
+Rules can also live in YAML instead of hand-written Python:
 
 ```python
 from bastion import load_policy_from_yaml
@@ -192,8 +192,8 @@ Fails closed (denies) if nobody responds within `timeout` seconds.
 <a href="https://bastion-dashboard-two.vercel.app"><b>→ Live demo</b></a>
 </div>
 
-A real Next.js app (`dashboard/`), not a toy — audit log, approval queue,
-and a policy editor, all wired to the SDK over HTTP:
+A real Next.js app (`dashboard/`) — audit log, approval queue, and a
+policy editor, all wired to the SDK over HTTP:
 
 ```python
 from bastion import AuditLogger, guard
@@ -245,7 +245,7 @@ for now (see [CONTRIBUTING.md](CONTRIBUTING.md)).
 ## Contributing
 
 Issues and PRs welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). Found a
-security issue? See [SECURITY.md](SECURITY.md), please don't open a public
+security issue? See [SECURITY.md](SECURITY.md) instead of opening a public
 issue for it.
 
 ## License
