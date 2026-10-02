@@ -10,6 +10,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+claude-agent-sdk = ["claude-agent-sdk>=0.1"]
 langgraph = ["langchain-core>=0.3", "langgraph>=0.2"]
 openai-agents = ["openai-agents>=0.1"]
 slack = ["slack_sdk>=3.27"]
@@ -52,6 +53,10 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "agents.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "claude_agent_sdk.*"
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

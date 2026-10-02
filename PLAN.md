@@ -258,13 +258,43 @@ wired all the way through:
   loop needs an OpenAI API key, so that part is covered by the test
   suite's direct-invocation tests instead, not this example.
 
+### Claude Agent SDK integration (2026-10-02)
+
+`src/agentguard/integrations/claude_agent_sdk.py` —
+`guarded_can_use_tool()`, a `can_use_tool` callback for `ClaudeAgentOptions`.
+
+- This integration point is structurally different from (and simpler than)
+  LangGraph/OpenAI Agents: the SDK has a first-class permission system
+  (`can_use_tool: Callable[[tool_name, args, context], Awaitable[Allow|Deny]]`)
+  invoked for *every* tool call — built-in (Bash, Read, Write, ...) and
+  custom MCP tools alike. Discovered this by inspecting the real package's
+  exports (`CanUseTool`, `PermissionResultAllow`, `PermissionResultDeny`,
+  `ToolPermissionContext`) before writing anything, same as the other two.
+  No per-tool wrapping needed — one callback is the entire integration.
+- Reuses `evaluate_and_record()` (same shared core as the OpenAI Agents
+  integration) — third framework, zero duplicated policy/audit/approval
+  logic.
+- 6 new tests (52 total) against the real installed `claude_agent_sdk`
+  package — calling the callback directly with real `ToolPermissionContext`
+  / `PermissionResultAllow` / `PermissionResultDeny` objects, the same
+  contract the SDK itself uses internally. Covers allow, block (checks the
+  actual deny message contains the policy reason), approve+approved,
+  approve+denied, a custom (non-built-in) tool name evaluated identically
+  to a built-in one, and that blocks are recorded to the audit log.
+- Verified optional-import degradation the same way as the other two:
+  uninstalled `claude-agent-sdk`, confirmed `ruff`/`mypy`/`pytest` still
+  pass clean (module-level `importorskip`), reinstalled, reverified green.
+- `examples/claude_agent_sdk_demo.py` — verified it actually runs end to
+  end, including calling the real callback directly (allow + block cases)
+  without needing the Claude Code CLI that a full `query()` call would
+  require.
+
+All three planned framework integrations (LangGraph, OpenAI Agents SDK,
+Claude Agent SDK) are now done. 52 Python tests passing.
+
 ## Next up, in order
 
-1. **Claude Agent SDK integration**, same rigor as above: inspect the
-   real installed package's current tool-definition API before writing
-   against it, verify with tests against the real package (not mocked),
-   check optional-import degradation.
-2. **Ship v1 publicly.** OSS SDK on GitHub/PyPI + hosted dashboard waitlist.
+1. **Ship v1 publicly.** OSS SDK on GitHub/PyPI + hosted dashboard waitlist.
    Get 5-10 real teams to install it before iterating further — see GTM
    notes in NOTES.md.
 

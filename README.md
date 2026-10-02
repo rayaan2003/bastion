@@ -114,6 +114,21 @@ raising — the same idiom the SDK itself uses when a tool raises an
 exception, so the model sees why and can react. See
 `examples/openai_agents_demo.py`.
 
+## Claude Agent SDK integration
+
+```python
+from claude_agent_sdk import ClaudeAgentOptions
+from agentguard.integrations.claude_agent_sdk import guarded_can_use_tool
+
+options = ClaudeAgentOptions(can_use_tool=guarded_can_use_tool(policy=policy))
+```
+
+Hooks into the SDK's own permission system (`can_use_tool`), which it calls
+for *every* tool invocation — built-in tools (Bash, Read, Write, ...) and
+custom tools registered via `create_sdk_mcp_server` alike. Unlike the
+LangGraph/OpenAI Agents integrations, nothing needs wrapping per-tool — one
+callback covers everything. See `examples/claude_agent_sdk_demo.py`.
+
 ## Slack approval
 
 ```python
