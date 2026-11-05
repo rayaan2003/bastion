@@ -8,6 +8,7 @@ export interface AuditEvent {
   args: Record<string, unknown>;
   action: string;
   reason: string;
+  call_id: string | null;
   created_at: string;
 }
 
@@ -19,13 +20,14 @@ export interface NewAuditEvent {
   args: Record<string, unknown>;
   action: string;
   reason: string;
+  call_id: string | null;
 }
 
 export async function insertEvent(event: NewAuditEvent): Promise<void> {
   const db = await getDb();
   await db.query(
-    `INSERT INTO audit_events (id, "timestamp", session_id, tool_name, args, action, reason)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
+    `INSERT INTO audit_events (id, "timestamp", session_id, tool_name, args, action, reason, call_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
      ON CONFLICT (id) DO NOTHING`,
     [
       event.id,
@@ -35,6 +37,7 @@ export async function insertEvent(event: NewAuditEvent): Promise<void> {
       JSON.stringify(event.args),
       event.action,
       event.reason,
+      event.call_id,
     ]
   );
 }
@@ -43,6 +46,7 @@ export interface EventFilters {
   toolName?: string;
   action?: string;
   sessionId?: string;
+  callId?: string;
   limit?: number;
 }
 
@@ -62,6 +66,10 @@ export async function listEvents(filters: EventFilters = {}): Promise<AuditEvent
   if (filters.sessionId) {
     params.push(filters.sessionId);
     conditions.push(`session_id = $${params.length}`);
+  }
+  if (filters.callId) {
+    params.push(filters.callId);
+    conditions.push(`call_id = $${params.length}`);
   }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";

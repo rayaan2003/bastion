@@ -23,7 +23,7 @@ from bastion import Action, AuditLogger, PolicyEngine, Rule  # noqa: E402
 from bastion.approval import ApprovalHandler  # noqa: E402
 from bastion.integrations.claude_agent_sdk import (  # noqa: E402
     guarded_can_use_tool,
-    guarded_pre_tool_use,
+    guarded_hooks,
 )
 
 
@@ -148,11 +148,19 @@ def run_hook(matcher: HookMatcher, tool_name: str, tool_input: dict) -> dict:
     return output
 
 
-def _hook(policy: PolicyEngine, approval_handler=None, actions: list | None = None) -> HookMatcher:
-    sink = (lambda e: actions.append(e.action)) if actions is not None else (lambda e: None)
-    return guarded_pre_tool_use(
+def _hooks(policy: PolicyEngine, approval_handler=None, events: list | None = None) -> dict:
+    sink = events.append if events is not None else (lambda e: None)
+    return guarded_hooks(
         policy=policy, audit=AuditLogger(sink=sink), approval_handler=approval_handler
     )
+
+
+def _hook(policy: PolicyEngine, approval_handler=None, actions: list | None = None) -> HookMatcher:
+    sink = (lambda e: actions.append(e.action)) if actions is not None else (lambda e: None)
+    hooks = guarded_hooks(
+        policy=policy, audit=AuditLogger(sink=sink), approval_handler=approval_handler
+    )
+    return hooks["PreToolUse"][0]
 
 
 def _no_shell() -> PolicyEngine:
@@ -161,12 +169,16 @@ def _no_shell() -> PolicyEngine:
     )
 
 
-def test_hook_matcher_covers_every_tool_and_fails_closed():
-    matcher = _hook(_no_shell())
-    assert matcher.matcher is None
-    assert matcher.on_failure == "block"
-    assert matcher.timeout == 600.0
-    ClaudeAgentOptions(hooks={"PreToolUse": [matcher]})
+def test_hooks_cover_every_tool_and_pre_tool_use_fails_closed():
+    hooks = _hooks(_no_shell())
+    assert set(hooks) == {"PreToolUse", "PostToolUse", "PostToolUseFailure"}
+    [pre] = hooks["PreToolUse"]
+    assert pre.matcher is None
+    assert pre.on_failure == "block"
+    assert pre.timeout == 600.0
+    # Outcome hooks must never block a call that already ran.
+    assert all(m.on_failure is None for m in hooks["PostToolUse"] + hooks["PostToolUseFailure"])
+    ClaudeAgentOptions(hooks=hooks)
 
 
 def test_hook_blocks_with_deny_decision_and_reason():
@@ -223,3 +235,41 @@ def test_hook_ignores_non_pre_tool_use_events():
         "stop_hook_active": False,
     }
     assert asyncio.run(callback(stop_input, None, {"signal": None})) == {}
+
+
+def _post_input(event: str, tool_name: str, **extra) -> dict:
+    return {
+        "hook_event_name": event,
+        "session_id": "sess-1",
+        "transcript_path": "/tmp/t.jsonl",
+        "cwd": "/tmp",
+        "tool_name": tool_name,
+        "tool_input": {"command": "ls"},
+        "tool_use_id": "toolu_1",
+        **extra,
+    }
+
+
+def test_outcome_hooks_record_completed_and_failed_under_tool_use_id():
+    events: list = []
+    hooks = _hooks(PolicyEngine(), events=events)
+    run_hook(hooks["PreToolUse"][0], "Bash", {"command": "ls"})
+
+    [post] = hooks["PostToolUse"][0].hooks
+    [post_failure] = hooks["PostToolUseFailure"][0].hooks
+    ok = asyncio.run(
+        post(_post_input("PostToolUse", "Bash", tool_response="a"), "toolu_1", {"signal": None})
+    )
+    failed = asyncio.run(post_failure(
+        _post_input("PostToolUseFailure", "Bash", error="exit 1: 123-45-6789 not found"),
+        "toolu_1",
+        {"signal": None},
+    ))
+
+    assert ok == {} and failed == {}
+    assert [(e.action, e.call_id) for e in events] == [
+        ("allowed", "toolu_1"),
+        ("completed", "toolu_1"),
+        ("failed", "toolu_1"),
+    ]
+    assert events[2].reason == "exit 1: [REDACTED:ssn_us] not found"

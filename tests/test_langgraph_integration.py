@@ -48,7 +48,7 @@ def test_async_only_tool_allowed_call_runs():
     [guarded] = guard_tools([lookup], policy=_block_deletes(), audit=audit)
 
     assert asyncio.run(guarded.ainvoke({"name": "x"})) == "found x"
-    assert actions == ["allowed"]
+    assert actions == ["allowed", "completed"]
 
 
 def test_tool_with_both_sync_and_async_is_guarded_on_both_paths():

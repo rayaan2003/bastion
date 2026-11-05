@@ -9,7 +9,6 @@ What's next, in priority order. Shipped work moves to
 1. **Trustworthy audit log**
    - record who approved or denied (Slack user, dashboard reviewer)
    - link each approval to its session and audit event
-   - record whether an allowed tool call then succeeded or failed
    - optional redaction of args shown in Slack/dashboard approval requests
 2. **Tamper-evident audit** — hash-chained events so gaps or edits are
    detectable.
@@ -33,5 +32,6 @@ What's next, in priority order. Shipped work moves to
 
 - Shadow mode (log-only rollout), per rule or whole policy.
 - PII/secrets redacted in audit-logged args by default.
+- `call_id` links each call's decision and outcome (`completed`/`failed`).
 - Claude Agent SDK enforcement via a `PreToolUse` hook, so pre-allowed tools
   and `bypassPermissions` no longer skip policy.

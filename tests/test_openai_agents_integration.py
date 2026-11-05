@@ -132,3 +132,50 @@ def test_guarding_non_function_tool_raises_type_error(tmp_path):
     audit = AuditLogger(log_path=str(tmp_path / "audit.jsonl"))
     with pytest.raises(TypeError, match=r"agents\.FunctionTool"):
         guarded_tools(["not a tool"], policy=make_policy(), audit=audit)
+
+
+def _recording_audit() -> tuple[AuditLogger, list]:
+    events: list = []
+    return AuditLogger(sink=events.append), events
+
+
+def test_outcome_recorded_under_the_sdk_tool_call_id():
+    audit, events = _recording_audit()
+    [tool] = guarded_tools([search_docs], policy=make_policy(), audit=audit)
+
+    invoke(tool, '{"query": "x"}')
+    assert [(e.action, e.call_id) for e in events] == [
+        ("allowed", "call_1"),
+        ("completed", "call_1"),
+    ]
+
+
+def test_tool_error_handled_by_the_sdk_is_recorded_as_completed():
+    # @function_tool's default failure_error_function turns the exception
+    # into a result string before bastion sees it.
+    @function_tool
+    def flaky(x: int) -> str:
+        """Fails."""
+        raise ValueError("down")
+
+    audit, events = _recording_audit()
+    [tool] = guarded_tools([flaky], policy=make_policy(), audit=audit)
+    result = invoke(tool, '{"x": 1}')
+
+    assert "error" in result.lower()
+    assert [e.action for e in events] == ["allowed", "completed"]
+
+
+def test_tool_error_is_recorded_as_failed_when_the_sdk_lets_it_raise():
+    @function_tool(failure_error_function=None)
+    def flaky(x: int) -> str:
+        """Fails."""
+        raise ValueError("down")
+
+    audit, events = _recording_audit()
+    [tool] = guarded_tools([flaky], policy=make_policy(), audit=audit)
+    with pytest.raises(Exception, match="down"):
+        invoke(tool, '{"x": 1}')
+
+    assert [e.action for e in events] == ["allowed", "failed"]
+    assert "down" in events[1].reason

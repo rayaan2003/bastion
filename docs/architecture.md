@@ -18,10 +18,13 @@ integrations/<framework>.py         adapts the framework's tool hook
 guard.evaluate_and_record()         the one enforcement core
         ├─ PolicyEngine.evaluate()  → Decision (+ shadow decision)
         ├─ ApprovalHandler          only if the decision is APPROVE
-        └─ AuditLogger.record()     every outcome, including would_*
+        └─ AuditLogger.record()     every decision, including would_*
         │
         ▼
 tool runs, or the framework gets a "blocked" result
+        │
+        ▼
+guard.record_outcome()              completed / failed, same call_id
         ┆
         ┆  (async, best-effort)
         ▼
@@ -80,6 +83,15 @@ events logs a warning and drops them — making audit delivery a hard
 dependency of every tool call turned an observability outage into an agent
 outage. Revisit (local spool + retry) if guaranteed delivery is needed.
 
+**One call, several events, one `call_id`.** A decision is recorded before
+the tool runs and its outcome after, as separate events, rather than one
+event updated in place — sinks are append-only (JSONL, HTTP). The framework's
+own id is used where it has one (OpenAI `tool_call_id`, Claude `tool_use_id`)
+so bastion's log can be joined against the framework's traces. Outcomes are
+`completed`/`failed`, not success/error: bastion can only see whether the
+tool returned or raised, and the OpenAI Agents SDK converts exceptions into
+results by default.
+
 **Audit logs redact args; enforcement doesn't.** `AuditLogger` masks
 detected PII/secrets in the logged copy of args by default (strings, nested
 containers, and numbers such as a card passed as an int). Policy conditions
@@ -95,7 +107,7 @@ reviewer usually needs the real values to decide.
 | plain `guard()` | `BlockedByPolicy` raised |
 | LangGraph | `BlockedByPolicy`, caught by `ToolNode(handle_tool_errors=BlockedByPolicy)` → error `ToolMessage` |
 | OpenAI Agents SDK | the string `"Tool call blocked by policy: <reason>"` — raising would be swallowed into a generic error message by the SDK, losing the reason |
-| Claude Agent SDK | a `PreToolUse` hook returning `permissionDecision: "deny"` with the reason |
+| Claude Agent SDK | a `PreToolUse` hook returning `permissionDecision: "deny"` with the reason; `PostToolUse`/`PostToolUseFailure` hooks record the outcome |
 
 **Claude Agent SDK enforces through a `PreToolUse` hook, not `can_use_tool`.**
 The SDK only consults `can_use_tool` when its own permission rules would
@@ -105,7 +117,8 @@ call. An allowed call returns no decision rather than `"allow"`, since a
 hook allow also skips the SDK's permission checks; the matcher uses
 `on_failure="block"` so a hook error blocks the call; policy and approval
 run via `asyncio.to_thread` so an approval wait doesn't stall the SDK's
-event loop. `guarded_can_use_tool()` remains for compatibility.
+event loop. Outcome hooks don't set `on_failure`, so an audit error there can't block
+anything. `guarded_can_use_tool()` remains for compatibility.
 
 **LangChain tools are guarded on both `.func` and `.coroutine`.** `ainvoke`
 calls `.coroutine` directly when it's set, so wrapping only `.func` would

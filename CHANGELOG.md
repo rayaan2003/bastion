@@ -12,8 +12,15 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   values and numbers. Policy and the tool still see raw args.
   `AuditLogger(redact_args=False)` restores the old behaviour.
 
-- **`guarded_pre_tool_use()`** for the Claude Agent SDK: a `PreToolUse`
-  hook that enforces policy on every tool call. `guarded_can_use_tool()`
+- **Tool-call outcomes and `call_id`.** After an allowed call runs, a
+  `completed` or `failed` event (with the redacted error) is recorded.
+  Every event about one call — `would_*`, decision, outcome — shares a
+  `call_id`, using the framework's tool-call id where available. The
+  dashboard stores it (migrated on startup), filters by it, and links each
+  row to its call.
+- **`guarded_hooks()`** for the Claude Agent SDK: a `PreToolUse` hook that
+  enforces policy on every tool call, plus `PostToolUse` /
+  `PostToolUseFailure` hooks for outcomes. `guarded_can_use_tool()`
   only ran when the SDK's own permission rules would prompt, so tools
   pre-allowed via `allowed_tools` or settings files, and every tool under
   `permission_mode="bypassPermissions"`, skipped policy entirely. The hook

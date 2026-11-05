@@ -4,16 +4,17 @@ Usage:
 
     from claude_agent_sdk import ClaudeAgentOptions
     from bastion import PolicyEngine, Rule, Action
-    from bastion.integrations.claude_agent_sdk import guarded_pre_tool_use
+    from bastion.integrations.claude_agent_sdk import guarded_hooks
 
     policy = PolicyEngine()
     policy.add_rule(Rule(tool_pattern="Bash", action=Action.BLOCK, reason="no shell access"))
 
-    options = ClaudeAgentOptions(hooks={"PreToolUse": [guarded_pre_tool_use(policy=policy)]})
+    options = ClaudeAgentOptions(hooks=guarded_hooks(policy=policy))
 
-`guarded_pre_tool_use()` is the one to use: a PreToolUse hook runs for every
-tool call, built-in (Bash, Read, Write, ...) and MCP alike, whatever the
-permission settings.
+`guarded_hooks()` is the one to use: its PreToolUse hook runs for every tool
+call, built-in (Bash, Read, Write, ...) and MCP alike, whatever the
+permission settings, and its PostToolUse / PostToolUseFailure hooks audit
+whether each call then completed or failed.
 
 `guarded_can_use_tool()` hooks the SDK's permission prompt instead, which the
 SDK skips for tools pre-allowed by `allowed_tools` or settings files and for
@@ -30,7 +31,7 @@ from typing import TYPE_CHECKING, Any
 
 from bastion.approval import ApprovalHandler, ConsoleApprovalHandler
 from bastion.audit import AuditLogger
-from bastion.guard import evaluate_and_record
+from bastion.guard import evaluate_and_record, record_outcome
 from bastion.policy import PolicyEngine
 
 if TYPE_CHECKING:
@@ -42,6 +43,7 @@ if TYPE_CHECKING:
         HookMatcher,
         ToolPermissionContext,
     )
+    from claude_agent_sdk.types import HookEvent
 
 
 def guarded_can_use_tool(
@@ -51,7 +53,7 @@ def guarded_can_use_tool(
     approval_handler: ApprovalHandler | None = None,
 ) -> CanUseTool:
     """Build a `can_use_tool` callback for `ClaudeAgentOptions`. Prefer
-    `guarded_pre_tool_use()`, which the SDK can't skip — see module docstring.
+    `guarded_hooks()`, which the SDK can't skip — see module docstring.
     """
     try:
         from claude_agent_sdk import PermissionResultAllow, PermissionResultDeny
@@ -77,24 +79,27 @@ def guarded_can_use_tool(
     return can_use_tool
 
 
-def guarded_pre_tool_use(
+def guarded_hooks(
     *,
     policy: PolicyEngine,
     audit: AuditLogger | None = None,
     approval_handler: ApprovalHandler | None = None,
     timeout: float = 600.0,
-) -> HookMatcher:
-    """Build a PreToolUse `HookMatcher` that enforces policy on every tool
-    call:
+) -> dict[HookEvent, list[HookMatcher]]:
+    """Build the `hooks` for `ClaudeAgentOptions` that enforce policy on every
+    tool call and audit each call's outcome:
 
-        ClaudeAgentOptions(hooks={"PreToolUse": [guarded_pre_tool_use(policy=policy)]})
+        ClaudeAgentOptions(hooks=guarded_hooks(policy=policy))
 
-    timeout: seconds the SDK waits for the hook. It has to cover an approval
-    wait, so keep it above your approval handler's own timeout — the SDK's
-    default of 60s would cut off a Slack or dashboard approval.
+    To combine with your own hooks, extend the lists per event.
 
-    The matcher fails closed (`on_failure="block"`): if the hook raises, the
-    tool call is blocked, not allowed.
+    timeout: seconds the SDK waits for the PreToolUse hook. It has to cover
+    an approval wait, so keep it above your approval handler's own timeout —
+    the SDK's default of 60s would cut off a Slack or dashboard approval.
+
+    The PreToolUse matcher fails closed (`on_failure="block"`): if the hook
+    raises, the tool call is blocked, not allowed. Audit events use the
+    SDK's `tool_use_id` as their `call_id`.
     """
     try:
         from claude_agent_sdk import HookMatcher
@@ -122,6 +127,7 @@ def guarded_pre_tool_use(
             policy=policy,
             audit=audit,
             approval_handler=approval_handler,
+            call_id=input_data["tool_use_id"],
         )
         if allowed:
             # No opinion rather than "allow": a PreToolUse allow also skips the
@@ -135,4 +141,21 @@ def guarded_pre_tool_use(
             }
         }
 
-    return HookMatcher(matcher=None, hooks=[pre_tool_use], timeout=timeout, on_failure="block")
+    async def post_tool_use(
+        input_data: HookInput, tool_use_id: str | None, context: HookContext
+    ) -> HookJSONOutput:
+        if input_data["hook_event_name"] == "PostToolUse":
+            record_outcome(audit, input_data["tool_name"], input_data["tool_use_id"])
+        elif input_data["hook_event_name"] == "PostToolUseFailure":
+            record_outcome(
+                audit, input_data["tool_name"], input_data["tool_use_id"], input_data["error"]
+            )
+        return {}
+
+    return {
+        "PreToolUse": [
+            HookMatcher(matcher=None, hooks=[pre_tool_use], timeout=timeout, on_failure="block")
+        ],
+        "PostToolUse": [HookMatcher(matcher=None, hooks=[post_tool_use])],
+        "PostToolUseFailure": [HookMatcher(matcher=None, hooks=[post_tool_use])],
+    }
