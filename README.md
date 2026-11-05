@@ -203,8 +203,14 @@ Every decision is recorded. By default it's appended to
 ```
 
 `action` is one of `allowed`, `blocked`, `approved`, `denied`, or
-`would_*` for shadow rules. To send events elsewhere, pass any
-`Callable[[AuditEvent], None]`:
+`would_*` for shadow rules.
+
+PII and secrets in args are masked in the log
+(`"ssn [REDACTED:ssn_us]"`) using the [scanner](#piisecrets-scanning).
+Policy rules and the tool itself still get the real values. Pass
+`AuditLogger(redact_args=False)` to log args as-is.
+
+To send events elsewhere, pass any `Callable[[AuditEvent], None]`:
 
 ```python
 from bastion import AuditLogger

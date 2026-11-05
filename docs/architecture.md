@@ -80,6 +80,13 @@ events logs a warning and drops them — making audit delivery a hard
 dependency of every tool call turned an observability outage into an agent
 outage. Revisit (local spool + retry) if guaranteed delivery is needed.
 
+**Audit logs redact args; enforcement doesn't.** `AuditLogger` masks
+detected PII/secrets in the logged copy of args by default (strings, nested
+containers, and numbers such as a card passed as an int). Policy conditions
+and the tool always get the raw args — redacting before evaluation would
+blind `contains_pii` rules. Approval requests are not redacted, since a
+reviewer usually needs the real values to decide.
+
 **How a block surfaces depends on the framework**, chosen so the model sees
 *why* and can react instead of the run crashing:
 

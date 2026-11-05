@@ -15,6 +15,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+from bastion.scanning import redact, scan_text
+
 
 @dataclass
 class AuditEvent:
@@ -41,11 +43,39 @@ def _jsonl_sink(path: Path) -> Sink:
     return write
 
 
+def _redacted(value: Any) -> Any:
+    if isinstance(value, str):
+        return redact(value)
+    if isinstance(value, dict):
+        return {k: _redacted(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_redacted(v) for v in value]
+    # A card number passed as an int is still a card number.
+    if isinstance(value, int | float) and not isinstance(value, bool):
+        text = str(value)
+        return redact(text) if scan_text(text) else value
+    return value
+
+
 class AuditLogger:
-    def __init__(self, log_path: str = "bastion_audit.jsonl", session_id: str | None = None,
-                 sink: Sink | None = None):
+    """Records every policy decision to `sink` (a local JSONL file by default).
+
+    redact_args: PII/secrets detected in tool-call args (see bastion.scanning)
+    are masked in the logged copy. Policy evaluation and the tool itself
+    still get the raw args — only what's written to the audit log changes.
+    """
+
+    def __init__(
+        self,
+        log_path: str = "bastion_audit.jsonl",
+        session_id: str | None = None,
+        sink: Sink | None = None,
+        *,
+        redact_args: bool = True,
+    ):
         self.session_id = session_id or str(uuid.uuid4())
         self.sink = sink or _jsonl_sink(Path(log_path))
+        self.redact_args = redact_args
 
     def record(self, tool_name: str, args: dict[str, Any], action: str, reason: str) -> AuditEvent:
         event = AuditEvent(
@@ -53,7 +83,7 @@ class AuditLogger:
             timestamp=time.time(),
             session_id=self.session_id,
             tool_name=tool_name,
-            args=args,
+            args=_redacted(args) if self.redact_args else args,
             action=action,
             reason=reason,
         )
