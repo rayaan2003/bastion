@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import fnmatch
+import logging
 import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
+
+_log = logging.getLogger("bastion")
 
 
 class Action(str, Enum):
@@ -25,6 +28,9 @@ class Rule:
         on tool_pattern alone (any call to that tool).
     action: what to do when tool_pattern + condition match.
     reason: human-readable explanation, shown in logs and approval prompts.
+    shadow: if True, the rule is evaluated and its outcome audited as
+        `would_<action>`, but never enforced — for trialling a rule against
+        real traffic before turning it on.
     """
 
     tool_pattern: str
@@ -32,6 +38,7 @@ class Rule:
     condition: Callable[[dict[str, Any]], bool] | None = None
     reason: str = ""
     name: str = ""
+    shadow: bool = False
 
     def matches(self, tool_name: str, args: dict[str, Any]) -> bool:
         if not fnmatch.fnmatch(tool_name, self.tool_pattern):
@@ -47,12 +54,15 @@ class Decision:
     rule: Rule | None
     tool_name: str
     args: dict[str, Any]
+    reason: str
+    # What would have happened had shadow rules been enforced. Only set when
+    # that differs from `action`.
+    shadow: Decision | None = None
 
-    @property
-    def reason(self) -> str:
-        if self.rule is None:
-            return "no matching rule — default allow"
-        return self.rule.reason or f"matched rule '{self.rule.name or self.rule.tool_pattern}'"
+
+def _rule_decision(rule: Rule, tool_name: str, args: dict[str, Any]) -> Decision:
+    reason = rule.reason or f"matched rule '{rule.name or rule.tool_pattern}'"
+    return Decision(rule.action, rule, tool_name, args, reason)
 
 
 # --- Common condition helpers ---------------------------------------------------
@@ -87,17 +97,70 @@ def any_arg_contains(substrings: list[str]) -> Callable[[dict[str, Any]], bool]:
 
 @dataclass
 class PolicyEngine:
-    """Evaluates rules in order; first match wins. No match => ALLOW by default."""
+    """Evaluates rules in order; first match wins. No match => `default_action`.
+
+    shadow: if True, nothing is enforced — every rule and the default action
+    behave as shadow rules (see `Rule.shadow`), so every call is allowed and
+    the policy's would-be decisions are audited. For rolling bastion out
+    against real traffic before it can block anything.
+    """
 
     rules: list[Rule] = field(default_factory=list)
     default_action: Action = Action.ALLOW
+    shadow: bool = False
 
     def add_rule(self, rule: Rule) -> PolicyEngine:
         self.rules.append(rule)
         return self
 
     def evaluate(self, tool_name: str, args: dict[str, Any]) -> Decision:
+        # Shadow rules are skipped over, not stopped at, so adding one can
+        # never change the enforced outcome of the rules behind it.
+        enforced: Decision | None = None
+        would: Decision | None = None
         for rule in self.rules:
-            if rule.matches(tool_name, args):
-                return Decision(action=rule.action, rule=rule, tool_name=tool_name, args=args)
-        return Decision(action=self.default_action, rule=None, tool_name=tool_name, args=args)
+            is_shadow = rule.shadow or self.shadow
+            if is_shadow and would is not None:
+                continue
+            if not self._matches(rule, is_shadow, tool_name, args):
+                continue
+            decision = _rule_decision(rule, tool_name, args)
+            if would is None:
+                would = decision
+            if not is_shadow:
+                enforced = decision
+                break
+
+        default = Decision(
+            self.default_action,
+            None,
+            tool_name,
+            args,
+            f"no matching rule — default {self.default_action.value}",
+        )
+        if would is None:
+            would = default
+        if enforced is None:
+            enforced = (
+                Decision(Action.ALLOW, None, tool_name, args, "shadow mode — policy not enforced")
+                if self.shadow
+                else default
+            )
+        if would.action != enforced.action:
+            enforced.shadow = would
+        return enforced
+
+    @staticmethod
+    def _matches(rule: Rule, is_shadow: bool, tool_name: str, args: dict[str, Any]) -> bool:
+        if not is_shadow:
+            return rule.matches(tool_name, args)
+        # A shadow rule is on trial; a bug in it mustn't break the tool call.
+        try:
+            return rule.matches(tool_name, args)
+        except Exception:
+            _log.warning(
+                "shadow rule '%s' condition raised; treating as no match",
+                rule.name or rule.tool_pattern,
+                exc_info=True,
+            )
+            return False

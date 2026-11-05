@@ -9,6 +9,9 @@ const ACTION_COLORS: Record<string, string> = {
   approved: "text-green-400",
   blocked: "text-red-400",
   denied: "text-red-400",
+  would_block: "text-amber-400",
+  would_approve: "text-amber-400",
+  would_allow: "text-amber-400",
 };
 
 export default async function AuditPage({
@@ -44,6 +47,9 @@ export default async function AuditPage({
           <option value="blocked">blocked</option>
           <option value="approved">approved</option>
           <option value="denied">denied</option>
+          <option value="would_block">would_block (shadow)</option>
+          <option value="would_approve">would_approve (shadow)</option>
+          <option value="would_allow">would_allow (shadow)</option>
         </select>
         <input
           name="session_id"

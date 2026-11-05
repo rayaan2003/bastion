@@ -45,6 +45,11 @@ def evaluate_and_record(
     """
     decision = policy.evaluate(tool_name, args)
 
+    if decision.shadow is not None:
+        audit.record(
+            tool_name, args, f"would_{decision.shadow.action.value}", decision.shadow.reason
+        )
+
     if decision.action == Action.BLOCK:
         audit.record(tool_name, args, "blocked", decision.reason)
         return False, decision.reason

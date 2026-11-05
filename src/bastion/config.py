@@ -7,12 +7,14 @@ the rules without touching code.
 Schema:
 
     default_action: allow   # or block / approve
+    shadow: false           # optional; true = enforce nothing, audit would-be decisions
 
     rules:
       - name: block-deletes          # optional, shown in logs/approval prompts
         tool: "delete_*"             # glob pattern matched against the tool name
         action: block                # allow / block / approve
         reason: "irreversible action"
+        shadow: false                # optional; true = audit as would_block, don't enforce
         condition:                   # optional; omit to match on `tool` alone
           type: arg_exceeds          # arg_exceeds / arg_matches_regex / any_arg_contains
           arg: amount
@@ -62,7 +64,10 @@ def policy_from_yaml_string(yaml_text: str) -> PolicyEngine:
 
 
 def policy_from_dict(data: dict[str, Any]) -> PolicyEngine:
-    engine = PolicyEngine(default_action=_parse_action(data.get("default_action", "allow")))
+    engine = PolicyEngine(
+        default_action=_parse_action(data.get("default_action", "allow")),
+        shadow=_parse_shadow(data.get("shadow", False)),
+    )
     for raw_rule in data.get("rules", []):
         engine.add_rule(_rule_from_dict(raw_rule))
     return engine
@@ -83,6 +88,7 @@ def _rule_from_dict(raw: dict[str, Any]) -> Rule:
         condition=condition,
         reason=raw.get("reason", ""),
         name=raw.get("name", ""),
+        shadow=_parse_shadow(raw.get("shadow", False)),
     )
 
 
@@ -113,3 +119,11 @@ def _parse_action(value: str) -> Action:
     except ValueError as e:
         known = ", ".join(a.value for a in Action)
         raise PolicyConfigError(f"unknown action {value!r}; known actions: {known}") from e
+
+
+def _parse_shadow(value: Any) -> bool:
+    # Checked strictly: a typo like `shadow: "false"` silently meaning true
+    # would turn enforcement off.
+    if not isinstance(value, bool):
+        raise PolicyConfigError(f"shadow must be true or false, got {value!r}")
+    return value
