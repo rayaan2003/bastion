@@ -146,17 +146,20 @@ from bastion.integrations.openai_agents import guarded_tools
 agent = Agent(name="support", tools=guarded_tools([search_docs, send_email], policy=policy))
 ```
 
-**Claude Agent SDK** — a `can_use_tool` callback, covering built-in tools
-(Bash, Write, ...) and MCP tools alike, with nothing wrapped per tool. The
-SDK skips the callback for tools already allowed by `allowed_tools` or a
-settings file, and for everything under `permission_mode="bypassPermissions"`,
-so don't combine those with bastion.
+**Claude Agent SDK** — a `PreToolUse` hook. It sees every tool call,
+built-in (Bash, Write, ...) and MCP alike, including tools pre-allowed by
+`allowed_tools` and under `permission_mode="bypassPermissions"`. A blocked
+call is denied with the reason; an allowed one is left to the SDK's normal
+permission checks. If the hook itself fails, the call is blocked.
 
 ```python
-from bastion.integrations.claude_agent_sdk import guarded_can_use_tool
+from bastion.integrations.claude_agent_sdk import guarded_pre_tool_use
 
-options = ClaudeAgentOptions(can_use_tool=guarded_can_use_tool(policy=policy))
+options = ClaudeAgentOptions(hooks={"PreToolUse": [guarded_pre_tool_use(policy=policy)]})
 ```
+
+Keep the hook's `timeout` (default 600s) above your approval handler's,
+or the SDK stops waiting before the reviewer answers.
 
 **Anything else** — `guard(fn, policy=...)` wraps any callable, sync or
 async, and raises `BlockedByPolicy`.
@@ -259,12 +262,11 @@ listed in [CHANGELOG.md](CHANGELOG.md). Next up is in
 
 Known limitations:
 
-- Approval handlers are synchronous, so with the async SDKs a pending
-  approval blocks the event loop.
+- Approval handlers are synchronous. The Claude Agent SDK hook runs them
+  on a worker thread, but with the OpenAI Agents SDK a pending approval
+  blocks the event loop.
 - The dashboard has one shared login and one API key; there are no users
   or projects yet.
-- The Claude Agent SDK integration is bypassed for pre-allowed tools (see
-  [Frameworks](#frameworks)).
 
 ## Contributing
 
