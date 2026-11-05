@@ -7,6 +7,11 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
+- **Audit args are redacted by default.** PII/secrets found by the scanner
+  are masked in logged args (`"[REDACTED:ssn_us]"`), including nested
+  values and numbers. Policy and the tool still see raw args.
+  `AuditLogger(redact_args=False)` restores the old behaviour.
+
 - **`guarded_pre_tool_use()`** for the Claude Agent SDK: a `PreToolUse`
   hook that enforces policy on every tool call. `guarded_can_use_tool()`
   only ran when the SDK's own permission rules would prompt, so tools
