@@ -11,3 +11,6 @@ dist/
 *.jsonl
 .env
 dash.txt
+
+# private founder notes (strategy, GTM) — never committed
+.private/

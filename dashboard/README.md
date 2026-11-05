@@ -32,7 +32,7 @@ no separate migration step at this scale.
 (v1 ran on PGlite, an embedded WASM Postgres, to avoid standing up a
 database before there were real users. Swapped to real Postgres once the
 dashboard was actually being deployed somewhere reachable — PGlite doesn't
-support concurrent writers from multiple processes. See `NOTES.md` at the
+support concurrent writers from multiple processes. See `docs/architecture.md` at the
 repo root.)
 
 ## Auth
@@ -94,7 +94,7 @@ again:
 
 ```python
 from bastion import AuditLogger, guard
-from bastion.integrations.dashboard import (
+from bastion.dashboard import (
     DashboardApprovalHandler,
     dashboard_audit_sink,
     load_policy_from_dashboard,

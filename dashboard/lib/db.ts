@@ -6,7 +6,7 @@ import path from "node:path";
 // to avoid standing up a database before there were real users - this
 // swaps to a real connection now that the dashboard is being deployed
 // somewhere reachable, where PGlite's single-process limitation (no
-// concurrent writers) would actually matter. See NOTES.md.
+// concurrent writers) would actually matter. See docs/architecture.md.
 
 declare global {
   var __bastionDb: Promise<Pool> | undefined;

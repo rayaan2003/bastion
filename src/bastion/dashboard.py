@@ -1,5 +1,5 @@
-"""Dashboard integration: ship audit events and route approvals through the
-bastion dashboard's HTTP API instead of a local JSONL file / Slack.
+"""Client for the bastion dashboard (dashboard/ in this repo): ship audit
+events, route approvals, and fetch policy over its HTTP API.
 
 Uses only the standard library (urllib) - no extra dependency required to
 talk to the dashboard. The dashboard's /api/* routes require an API key

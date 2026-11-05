@@ -2,7 +2,7 @@
 
 ApprovalHandler is the pluggable interface. ConsoleApprovalHandler is the
 default (prompts in the terminal) so the SDK works standalone with zero
-external services. Slack and dashboard handlers live in bastion.integrations.
+external services. Other channels: bastion.approval.slack, bastion.dashboard.
 """
 
 from __future__ import annotations
