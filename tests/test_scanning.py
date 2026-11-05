@@ -83,3 +83,28 @@ def test_enforce_text_policy_passthrough_when_clean():
 def test_enforce_text_policy_unknown_mode_raises():
     with pytest.raises(ValueError, match="unknown on_detect mode"):
         enforce_text_policy("a@b.com", categories=["email"], on_detect="ignore")
+
+
+def test_detects_aws_secret_access_key():
+    # AWS's own documented example secret key
+    text = "secret: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+    findings = scan_text(text, categories=["aws_secret_access_key"])
+    assert len(findings) == 1
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "commit 1d23dab4c5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0",  # git SHA / SHA-1 hex digest
+        "1D23DAB4C5E6F7A8B9C0D1E2F3A4B5C6D7E8F9A0",
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    ],
+)
+def test_aws_secret_ignores_single_case_40_char_strings(text):
+    assert scan_text(text, categories=["aws_secret_access_key"]) == []
+
+
+def test_detects_aws_secret_in_env_var_assignment():
+    text = "AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+    findings = scan_text(text, categories=["aws_secret_access_key"])
+    assert [f.matched_text for f in findings] == ["wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"]

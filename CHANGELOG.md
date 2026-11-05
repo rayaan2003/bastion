@@ -3,6 +3,32 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Fixed
+
+- **Policy bypass on async LangChain tools.** `guard_tools()` /
+  `guarded_tool_node()` only wrapped a tool's `.func`, so a tool with a
+  `.coroutine` (async, or built with both) ran unguarded via `ainvoke` —
+  the path LangGraph's `ToolNode` takes in an async graph. Async-only tools
+  raised `TypeError`. Both `.func` and `.coroutine` are now guarded, and
+  `guard()` returns an async wrapper for coroutine functions.
+- **Dashboard audit sink could break tool calls.** It POSTed synchronously
+  before every allowed tool ran, so a slow or unreachable dashboard stalled
+  or failed every call. It now ships on a background thread: failures are
+  logged on the `bastion` logger instead of raised, and pending events are
+  flushed at interpreter exit. Non-JSON arg values are stringified, same as
+  the JSONL sink.
+- **`aws_secret_access_key` detection.** Missed the most common leak format
+  (`AWS_SECRET_ACCESS_KEY=<key>`), and flagged every 40-character hex
+  string — git SHAs, SHA-1 digests — as a secret.
+- Integration error messages pointed at `pip install bastion[...]`, which
+  installs an unrelated package; now `bastionguard[...]`.
+- `send_email` rule in the LangGraph / OpenAI Agents examples was a
+  deny-list (`any_arg_contains(["all-staff", "external"])`) that let any
+  other recipient through. Now an allow-list: internal domain allowed,
+  everything else requires approval.
+
 ## [0.1.0] - 2026-10-03
 
 First published release.

@@ -30,8 +30,10 @@ _DETECTORS: dict[str, re.Pattern[str]] = {
     "ssn_us": re.compile(r"\b\d{3}-\d{2}-\d{4}\b"),
     "credit_card": re.compile(r"\b(?:\d[ -]?){13,16}\b"),
     "aws_access_key_id": re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b"),
+    # A leading "=" is allowed so `AWS_SECRET_ACCESS_KEY=<key>` matches; a
+    # trailing one isn't, since that's base64 padding on some longer blob.
     "aws_secret_access_key": re.compile(
-        r"(?<![A-Za-z0-9/+=])[A-Za-z0-9/+=]{40}(?![A-Za-z0-9/+=])"
+        r"(?<![A-Za-z0-9/+])[A-Za-z0-9/+]{40}(?![A-Za-z0-9/+=])"
     ),
     "generic_api_key": re.compile(
         r"\b(?:sk-[A-Za-z0-9]{20,}|ghp_[A-Za-z0-9]{36}|xox[baprs]-[A-Za-z0-9-]{10,})\b"
@@ -60,6 +62,14 @@ def _is_valid_match(category: str, matched_text: str) -> bool:
     if category == "credit_card":
         digits = re.sub(r"[ -]", "", matched_text)
         return len(digits) in (13, 14, 15, 16) and _luhn_valid(digits)
+    if category == "aws_secret_access_key":
+        # Real keys are mixed-case base64. Requiring all three classes rules
+        # out git SHAs and other hex digests, which are the same length.
+        return (
+            any(c.isupper() for c in matched_text)
+            and any(c.islower() for c in matched_text)
+            and any(c.isdigit() for c in matched_text)
+        )
     return True
 
 

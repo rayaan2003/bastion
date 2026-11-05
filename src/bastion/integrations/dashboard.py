@@ -9,19 +9,28 @@ the browser session cookie a human reviewer uses to log into the UI.
 
 from __future__ import annotations
 
+import atexit
 import json
+import logging
+import queue
+import threading
 import time
 import urllib.request
 from typing import Any
 
 from bastion.approval import ApprovalHandler
-from bastion.audit import AuditEvent, Sink
+from bastion.audit import AuditEvent
 from bastion.config import policy_from_yaml_string
 from bastion.policy import PolicyEngine
 
+_log = logging.getLogger("bastion")
+
+# Enough to ride out a short dashboard outage without unbounded memory growth.
+_MAX_PENDING_EVENTS = 10_000
+
 
 def _post_json(url: str, payload: dict[str, Any], api_key: str) -> dict[str, Any]:
-    data = json.dumps(payload).encode("utf-8")
+    data = json.dumps(payload, default=str).encode("utf-8")
     request = urllib.request.Request(
         url,
         data=data,
@@ -40,30 +49,78 @@ def _get_json(url: str, api_key: str) -> dict[str, Any]:
         return result
 
 
-def dashboard_audit_sink(base_url: str, api_key: str) -> Sink:
-    """Build a Sink for AuditLogger that POSTs events to the dashboard's
-    /api/events endpoint instead of writing a local JSONL file.
+class DashboardAuditSink:
+    """An AuditLogger sink that ships events to the dashboard's /api/events
+    endpoint on a background thread.
+
+    Tool calls never wait on the dashboard and never fail because of it: a
+    dashboard that is slow, down, or rejecting the API key gets a logged
+    warning (on the `bastion` logger) and the event is dropped. Policy
+    enforcement itself is local and unaffected. Pending events are flushed
+    at interpreter exit, so short-lived scripts don't lose their last events.
+    """
+
+    def __init__(self, base_url: str, api_key: str) -> None:
+        self.url = f"{base_url.rstrip('/')}/api/events"
+        self.api_key = api_key
+        self._queue: queue.Queue[AuditEvent] = queue.Queue(maxsize=_MAX_PENDING_EVENTS)
+        self._worker = threading.Thread(target=self._run, name="bastion-audit-sink", daemon=True)
+        self._worker.start()
+        atexit.register(self.flush)
+
+    def __call__(self, event: AuditEvent) -> None:
+        try:
+            self._queue.put_nowait(event)
+        except queue.Full:
+            _log.warning(
+                "dashboard audit queue full, dropping event %s (%s)", event.id, event.tool_name
+            )
+
+    def flush(self, timeout: float = 10.0) -> bool:
+        """Block until every queued event has been sent or has failed.
+        Returns False if `timeout` elapsed first."""
+        deadline = time.monotonic() + timeout
+        # Queue.join() has no timeout, so wait on its condition directly.
+        with self._queue.all_tasks_done:
+            while self._queue.unfinished_tasks:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    return False
+                self._queue.all_tasks_done.wait(remaining)
+        return True
+
+    def _run(self) -> None:
+        while True:
+            event = self._queue.get()
+            try:
+                _post_json(
+                    self.url,
+                    {
+                        "id": event.id,
+                        "timestamp": event.timestamp,
+                        "session_id": event.session_id,
+                        "tool_name": event.tool_name,
+                        "args": event.args,
+                        "action": event.action,
+                        "reason": event.reason,
+                    },
+                    self.api_key,
+                )
+            except Exception:
+                _log.warning(
+                    "failed to ship audit event %s to %s", event.id, self.url, exc_info=True
+                )
+            finally:
+                self._queue.task_done()
+
+
+def dashboard_audit_sink(base_url: str, api_key: str) -> DashboardAuditSink:
+    """Build a sink for AuditLogger that ships events to the dashboard
+    instead of writing a local JSONL file:
 
         AuditLogger(sink=dashboard_audit_sink("http://localhost:3000", api_key))
     """
-    url = f"{base_url.rstrip('/')}/api/events"
-
-    def sink(event: AuditEvent) -> None:
-        _post_json(
-            url,
-            {
-                "id": event.id,
-                "timestamp": event.timestamp,
-                "session_id": event.session_id,
-                "tool_name": event.tool_name,
-                "args": event.args,
-                "action": event.action,
-                "reason": event.reason,
-            },
-            api_key,
-        )
-
-    return sink
+    return DashboardAuditSink(base_url, api_key)
 
 
 def load_policy_from_dashboard(base_url: str, api_key: str) -> PolicyEngine:

@@ -81,14 +81,26 @@ def guard(
     audit = audit or AuditLogger()
     approval_handler = approval_handler or ConsoleApprovalHandler()
 
-    @functools.wraps(fn)
-    def wrapper(*args: Any, **kwargs: Any) -> Any:
+    def enforce(args: tuple[Any, ...], kwargs: dict[str, Any]) -> None:
         call_args = _build_args_dict(fn, args, kwargs)
         allowed, reason = evaluate_and_record(
             name, call_args, policy=policy, audit=audit, approval_handler=approval_handler
         )
         if not allowed:
             raise BlockedByPolicy(name, reason)
+
+    if inspect.iscoroutinefunction(fn):
+
+        @functools.wraps(fn)
+        async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+            enforce(args, kwargs)
+            return await fn(*args, **kwargs)
+
+        return async_wrapper
+
+    @functools.wraps(fn)
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        enforce(args, kwargs)
         return fn(*args, **kwargs)
 
     return wrapper
@@ -101,40 +113,52 @@ def guard_tools(
     audit: AuditLogger | None = None,
     approval_handler: ApprovalHandler | None = None,
 ) -> list[Any]:
-    """Wrap a list of tools. Handles plain callables and LangChain/LangGraph
-    BaseTool-style objects (anything with a `.func` or `._run`/`.invoke`).
+    """Wrap a list of tools. Handles plain callables (sync or async) and
+    LangChain StructuredTool-style objects (anything with `.func` and/or
+    `.coroutine`).
 
-    For LangChain StructuredTool/BaseTool instances we wrap `.func` in place
-    so the tool object itself (name, description, schema) is unchanged and
-    still usable directly in a LangGraph tool node.
+    For LangChain tools we wrap `.func` and `.coroutine` in place so the tool
+    object itself (name, description, schema) is unchanged and still usable
+    directly in a LangGraph tool node. Both must be wrapped: `ainvoke` calls
+    `.coroutine` directly when it's set, so guarding only `.func` would let
+    every async invocation skip policy.
     """
     audit = audit or AuditLogger()
     approval_handler = approval_handler or ConsoleApprovalHandler()
     wrapped: list[Any] = []
 
     for tool in tools:
-        if callable(tool) and not hasattr(tool, "func"):
+        is_langchain_tool = hasattr(tool, "func") or hasattr(tool, "coroutine")
+        if callable(tool) and not is_langchain_tool:
             wrapped.append(
                 guard(tool, policy=policy, audit=audit, approval_handler=approval_handler)
             )
             continue
 
-        if hasattr(tool, "func") and callable(tool.func):
-            tool_name = getattr(tool, "name", getattr(tool.func, "__name__", "unknown_tool"))
-            tool.func = guard(
-                tool.func,
-                policy=policy,
-                audit=audit,
-                approval_handler=approval_handler,
-                tool_name=tool_name,
+        impls = [attr for attr in ("func", "coroutine") if callable(getattr(tool, attr, None))]
+        if not impls:
+            raise TypeError(
+                f"Don't know how to guard tool of type {type(tool)!r} — expected a "
+                "callable or an object with a callable `.func` or `.coroutine` "
+                "attribute (LangChain tool)."
             )
-            wrapped.append(tool)
-            continue
 
-        raise TypeError(
-            f"Don't know how to guard tool of type {type(tool)!r} — expected a "
-            "callable or an object with a `.func` attribute (LangChain tool)."
+        tool_name = getattr(tool, "name", None) or getattr(
+            getattr(tool, impls[0]), "__name__", "unknown_tool"
         )
+        for attr in impls:
+            setattr(
+                tool,
+                attr,
+                guard(
+                    getattr(tool, attr),
+                    policy=policy,
+                    audit=audit,
+                    approval_handler=approval_handler,
+                    tool_name=tool_name,
+                ),
+            )
+        wrapped.append(tool)
 
     return wrapped
 
