@@ -88,16 +88,26 @@ outage. Revisit (local spool + retry) if guaranteed delivery is needed.
 | plain `guard()` | `BlockedByPolicy` raised |
 | LangGraph | `BlockedByPolicy`, caught by `ToolNode(handle_tool_errors=BlockedByPolicy)` → error `ToolMessage` |
 | OpenAI Agents SDK | the string `"Tool call blocked by policy: <reason>"` — raising would be swallowed into a generic error message by the SDK, losing the reason |
-| Claude Agent SDK | `PermissionResultDeny(message=...)` from `can_use_tool` — built-in and MCP tools alike, but the SDK skips the callback for tools pre-allowed via `allowed_tools`/settings and under `bypassPermissions` |
+| Claude Agent SDK | a `PreToolUse` hook returning `permissionDecision: "deny"` with the reason |
+
+**Claude Agent SDK enforces through a `PreToolUse` hook, not `can_use_tool`.**
+The SDK only consults `can_use_tool` when its own permission rules would
+prompt, so tools pre-allowed by `allowed_tools`/settings, and everything
+under `bypassPermissions`, never reached bastion. The hook runs for every
+call. An allowed call returns no decision rather than `"allow"`, since a
+hook allow also skips the SDK's permission checks; the matcher uses
+`on_failure="block"` so a hook error blocks the call; policy and approval
+run via `asyncio.to_thread` so an approval wait doesn't stall the SDK's
+event loop. `guarded_can_use_tool()` remains for compatibility.
 
 **LangChain tools are guarded on both `.func` and `.coroutine`.** `ainvoke`
 calls `.coroutine` directly when it's set, so wrapping only `.func` would
 let every async invocation skip policy.
 
 **`ApprovalHandler` is synchronous.** One interface for console, Slack and
-dashboard. In the async integrations an approval wait therefore blocks the
-event loop for its duration — fine for one agent, a problem for many on one
-loop. On the roadmap.
+dashboard. The Claude Agent SDK hook runs it on a worker thread; the OpenAI
+Agents integration still calls it inline, so an approval wait blocks that
+event loop. On the roadmap.
 
 **Scanning is regex, not ML.** No model download or spaCy dependency, fast
 enough to run on every call. It catches the common, costly leaks and has a

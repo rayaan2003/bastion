@@ -1,23 +1,22 @@
-"""Claude Agent SDK demo — guarded_can_use_tool wired into ClaudeAgentOptions.
+"""Claude Agent SDK demo — bastion enforcing policy through a PreToolUse hook.
 
 Requires: pip install bastionguard[claude-agent-sdk]
 
 Running a full query (claude_agent_sdk.query(...) / ClaudeSDKClient) shells
 out to the Claude Code CLI and needs it installed and authenticated. This
-script shows the wiring and calls the callback directly (the same way the
-SDK calls it internally) to prove it works without needing that CLI - see
-tests/test_claude_agent_sdk_integration.py for the full allow/block/approve
-behavior.
+script shows the wiring and calls the hook directly, the same way the SDK
+does when the CLI asks it about a tool call — see
+tests/test_claude_agent_sdk_integration.py for the full behavior.
 
 Run: python examples/claude_agent_sdk_demo.py
 """
 
 import asyncio
 
-from claude_agent_sdk import ClaudeAgentOptions, ToolPermissionContext
+from claude_agent_sdk import ClaudeAgentOptions
 
 from bastion import Action, AuditLogger, PolicyEngine, Rule
-from bastion.integrations.claude_agent_sdk import guarded_can_use_tool
+from bastion.integrations.claude_agent_sdk import guarded_pre_tool_use
 
 
 def build_options() -> ClaudeAgentOptions:
@@ -28,29 +27,43 @@ def build_options() -> ClaudeAgentOptions:
         reason="no shell access for this agent",
     ))
     policy.add_rule(Rule(
-        tool_pattern="delete_*",
+        tool_pattern="mcp__*__delete_*",
         action=Action.BLOCK,
         reason="irreversible action, blocked by default policy",
     ))
 
     audit = AuditLogger(log_path="examples/claude_agent_sdk_audit.jsonl")
-    can_use_tool = guarded_can_use_tool(policy=policy, audit=audit)
+    hook = guarded_pre_tool_use(policy=policy, audit=audit)
 
-    # One callback covers every tool call the agent makes - built-in
-    # (Bash, Read, Write, ...) and custom MCP tools alike.
-    return ClaudeAgentOptions(can_use_tool=can_use_tool)
+    # A PreToolUse hook sees every tool call, even with allowed_tools or
+    # permission_mode="bypassPermissions" set.
+    return ClaudeAgentOptions(
+        hooks={"PreToolUse": [hook]},
+        allowed_tools=["Read", "Bash"],
+    )
 
 
 async def main() -> None:
     options = build_options()
-    print("Built ClaudeAgentOptions with a guarded can_use_tool callback.")
+    assert options.hooks is not None
+    [callback] = options.hooks["PreToolUse"][0].hooks
+    print("Built ClaudeAgentOptions with a bastion PreToolUse hook.")
 
-    # Call it the same way the SDK does internally, no CLI/network needed.
-    ctx = ToolPermissionContext()
-    allowed = await options.can_use_tool("Read", {"file_path": "/etc/hosts"}, ctx)
-    blocked = await options.can_use_tool("Bash", {"command": "rm -rf /"}, ctx)
-    print("Read ->", allowed)
-    print("Bash ->", blocked)
+    for tool_name, tool_input in [
+        ("Read", {"file_path": "/etc/hosts"}),
+        ("Bash", {"command": "rm -rf /"}),
+    ]:
+        hook_input = {
+            "hook_event_name": "PreToolUse",
+            "session_id": "demo",
+            "transcript_path": "",
+            "cwd": ".",
+            "tool_name": tool_name,
+            "tool_input": tool_input,
+            "tool_use_id": "toolu_demo",
+        }
+        result = await callback(hook_input, "toolu_demo", {"signal": None})
+        print(f"{tool_name} ->", result or "no objection")
 
     print("\nRun a real query via claude_agent_sdk.query(options=options, ...) "
           "with the Claude Code CLI installed to execute for real.")

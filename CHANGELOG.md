@@ -7,6 +7,14 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
+- **`guarded_pre_tool_use()`** for the Claude Agent SDK: a `PreToolUse`
+  hook that enforces policy on every tool call. `guarded_can_use_tool()`
+  only ran when the SDK's own permission rules would prompt, so tools
+  pre-allowed via `allowed_tools` or settings files, and every tool under
+  `permission_mode="bypassPermissions"`, skipped policy entirely. The hook
+  fails closed if it errors, defaults to a 600s timeout so approvals aren't
+  cut off, and runs approvals on a worker thread instead of the event loop.
+
 - **Shadow mode.** `Rule(shadow=True)` / `PolicyEngine(shadow=True)` (and
   `shadow: true` in YAML, per rule or top-level) evaluate rules and audit
   their outcome as `would_block` / `would_approve` / `would_allow` without
