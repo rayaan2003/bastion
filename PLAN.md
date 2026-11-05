@@ -292,6 +292,26 @@ wired all the way through:
 All three planned framework integrations (LangGraph, OpenAI Agents SDK,
 Claude Agent SDK) are now done. 52 Python tests passing.
 
+### Hardening + shadow mode (2026-11-05)
+
+- Fixed a policy bypass: LangChain tools with a `.coroutine` ran unguarded
+  via `ainvoke`. Dashboard audit sink made non-blocking (background thread,
+  flush at exit). AWS secret detector fixed in both directions. PR #2.
+- Shadow mode (`Rule.shadow`, `PolicyEngine.shadow`, YAML `shadow:`) —
+  first item from the enterprise-readiness gap list below.
+
+## Enterprise-readiness gaps, in priority order
+
+1. [x] Shadow mode (log-only rollout)
+2. [ ] Trustworthy audit: approver identity, approvals linked to session +
+       audit event, PII redaction in logged args, tool success/failure
+       recorded, tamper evidence
+3. [ ] Multi-user dashboard: projects/orgs, per-project API keys, roles;
+       SSO later
+4. [ ] Non-blocking approvals for async agents; policy hot-reload from the
+       dashboard
+5. [ ] Reach beyond Python (TypeScript SDK or MCP proxy)
+
 ## Next up, in order
 
 1. **Ship v1 publicly.** OSS SDK on GitHub/PyPI + hosted dashboard waitlist.

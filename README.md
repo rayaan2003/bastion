@@ -46,6 +46,7 @@ actually allowed to **do**.
 | | |
 |---|---|
 | 🛡️ **Policy engine** | Allow / block / require-approval rules, glob-matched tool names, conditions on args (`amount > 500`, regex match, contains-PII, ...) |
+| 👀 **Shadow mode** | Audit what a rule *would* do against real traffic before enforcing it — per rule or for the whole policy |
 | ✅ **Human-in-the-loop** | Console prompt, Slack (reaction-based, no webhook server), or the hosted dashboard — pluggable |
 | 📝 **Audit log, for free** | Every decision recorded automatically — JSONL locally or shipped to the dashboard |
 | 🔍 **PII/secrets scanning** | Regex-based (no ML model to download) — emails, SSNs, Luhn-validated credit cards, cloud credentials, private keys |
@@ -91,6 +92,33 @@ policy = load_policy_from_yaml("policy.yaml")
 ```
 
 See [`examples/policy.yaml`](examples/policy.yaml) for the schema.
+
+### Shadow mode — roll out without breaking anything
+
+Turn bastion on against real traffic before it's allowed to block anything.
+Shadow rules are evaluated and audited as `would_block` / `would_approve` /
+`would_allow`, but never enforced — and never page a human:
+
+```python
+policy = PolicyEngine(shadow=True)          # whole policy: enforce nothing yet
+policy.add_rule(Rule(tool_pattern="delete_*", action=Action.BLOCK, reason="irreversible"))
+
+# or trial one new rule inside an already-enforced policy:
+policy.add_rule(Rule(tool_pattern="send_*", action=Action.APPROVE, shadow=True))
+```
+
+```yaml
+shadow: true            # whole policy
+rules:
+  - tool: "send_*"
+    action: approve
+    shadow: true        # or just this rule
+```
+
+A shadow rule can't change the enforced outcome: evaluation skips past it
+to the real rules behind it, and a shadow rule whose condition raises is
+logged and ignored. Filter the dashboard's audit log by `would_*` to see
+what turning it on would do.
 
 ## Framework integrations
 

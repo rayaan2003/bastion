@@ -105,3 +105,15 @@ def test_audit_log_records_deny(tmp_path):
     content = log_path.read_text()
     assert "blocked" in content
     assert "Bash" in content
+
+
+def test_shadow_rule_allows_and_records_would_block():
+    actions: list[str] = []
+    policy = PolicyEngine()
+    policy.add_rule(Rule(tool_pattern="Bash", action=Action.BLOCK, shadow=True))
+    audit = AuditLogger(sink=lambda e: actions.append(e.action))
+    can_use_tool = guarded_can_use_tool(policy=policy, audit=audit, approval_handler=AlwaysDeny())
+
+    result = call(can_use_tool, "Bash", {"command": "rm -rf /"})
+    assert isinstance(result, PermissionResultAllow)
+    assert actions == ["would_block", "allowed"]

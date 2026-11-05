@@ -109,6 +109,14 @@ Async log shipped to backend -> Dashboard (Next.js + Postgres)
   feature. Revisit (e.g. local spool + retry) if a user needs guaranteed
   delivery for compliance.
 
+- 2026-11-05: Shadow mode is the rollout path — nobody turns on blocking
+  in production first, they watch what would have been blocked. Design
+  invariant: adding a shadow rule must never change enforced behaviour, so
+  evaluation skips past shadow matches (rather than first-match-wins
+  stopping at them) and a shadow rule's condition raising is swallowed and
+  logged. Audited as separate `would_<action>` events next to the real one
+  rather than a new AuditEvent field, so the dashboard schema is unchanged.
+
 ## Open questions
 
 - Naming for the product/repo — currently using placeholder name `bastion`

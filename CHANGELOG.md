@@ -5,6 +5,21 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added
+
+- **Shadow mode.** `Rule(shadow=True)` / `PolicyEngine(shadow=True)` (and
+  `shadow: true` in YAML, per rule or top-level) evaluate rules and audit
+  their outcome as `would_block` / `would_approve` / `would_allow` without
+  enforcing it or calling the approval handler. A shadow rule never changes
+  the enforced outcome of the rules behind it. Dashboard audit log colours
+  and filters `would_*` events.
+
+### Changed
+
+- `Decision.reason` is now a field rather than a computed property, and
+  the no-match reason names the real default (`default block`, not always
+  `default allow`).
+
 ### Fixed
 
 - **Policy bypass on async LangChain tools.** `guard_tools()` /
