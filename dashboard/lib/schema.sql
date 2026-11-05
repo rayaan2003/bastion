@@ -14,6 +14,11 @@ CREATE INDEX IF NOT EXISTS idx_audit_events_tool ON audit_events (tool_name);
 CREATE INDEX IF NOT EXISTS idx_audit_events_action ON audit_events (action);
 CREATE INDEX IF NOT EXISTS idx_audit_events_timestamp ON audit_events ("timestamp" DESC);
 
+-- Added after the table shipped; ALTER keeps existing deployments migrating
+-- on startup like the rest of this file.
+ALTER TABLE audit_events ADD COLUMN IF NOT EXISTS call_id TEXT;
+CREATE INDEX IF NOT EXISTS idx_audit_events_call ON audit_events (call_id);
+
 CREATE TABLE IF NOT EXISTS approval_requests (
   id TEXT PRIMARY KEY,
   tool_name TEXT NOT NULL,

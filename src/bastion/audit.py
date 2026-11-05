@@ -27,6 +27,9 @@ class AuditEvent:
     args: dict[str, Any]
     action: str
     reason: str
+    # Shared by every event about one tool call: any would_* event, the
+    # decision, and the completed/failed outcome.
+    call_id: str = ""
 
 
 Sink = Callable[[AuditEvent], None]
@@ -77,7 +80,15 @@ class AuditLogger:
         self.sink = sink or _jsonl_sink(Path(log_path))
         self.redact_args = redact_args
 
-    def record(self, tool_name: str, args: dict[str, Any], action: str, reason: str) -> AuditEvent:
+    def record(
+        self,
+        tool_name: str,
+        args: dict[str, Any],
+        action: str,
+        reason: str,
+        *,
+        call_id: str | None = None,
+    ) -> AuditEvent:
         event = AuditEvent(
             id=str(uuid.uuid4()),
             timestamp=time.time(),
@@ -86,6 +97,7 @@ class AuditLogger:
             args=_redacted(args) if self.redact_args else args,
             action=action,
             reason=reason,
+            call_id=call_id or str(uuid.uuid4()),
         )
         self.sink(event)
         return event

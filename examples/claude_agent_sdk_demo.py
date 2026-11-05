@@ -16,7 +16,7 @@ import asyncio
 from claude_agent_sdk import ClaudeAgentOptions
 
 from bastion import Action, AuditLogger, PolicyEngine, Rule
-from bastion.integrations.claude_agent_sdk import guarded_pre_tool_use
+from bastion.integrations.claude_agent_sdk import guarded_hooks
 
 
 def build_options() -> ClaudeAgentOptions:
@@ -33,12 +33,10 @@ def build_options() -> ClaudeAgentOptions:
     ))
 
     audit = AuditLogger(log_path="examples/claude_agent_sdk_audit.jsonl")
-    hook = guarded_pre_tool_use(policy=policy, audit=audit)
-
-    # A PreToolUse hook sees every tool call, even with allowed_tools or
+    # The PreToolUse hook sees every tool call, even with allowed_tools or
     # permission_mode="bypassPermissions" set.
     return ClaudeAgentOptions(
-        hooks={"PreToolUse": [hook]},
+        hooks=guarded_hooks(policy=policy, audit=audit),
         allowed_tools=["Read", "Bash"],
     )
 

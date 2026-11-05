@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json();
 
-  const { id, timestamp, session_id, tool_name, args, action, reason } = body;
+  const { id, timestamp, session_id, tool_name, args, action, reason, call_id } = body;
   if (!id || !session_id || !tool_name || !action) {
     return NextResponse.json(
       { error: "id, session_id, tool_name, and action are required" },
@@ -24,6 +24,7 @@ export async function POST(request: NextRequest) {
     args: args ?? {},
     action,
     reason: reason ?? "",
+    call_id: call_id || null,
   });
 
   return NextResponse.json({ ok: true }, { status: 201 });
@@ -38,6 +39,7 @@ export async function GET(request: NextRequest) {
     toolName: searchParams.get("tool_name") ?? undefined,
     action: searchParams.get("action") ?? undefined,
     sessionId: searchParams.get("session_id") ?? undefined,
+    callId: searchParams.get("call_id") ?? undefined,
     limit: searchParams.get("limit") ? Number(searchParams.get("limit")) : undefined,
   });
   return NextResponse.json({ events });

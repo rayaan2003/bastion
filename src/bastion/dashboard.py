@@ -103,6 +103,7 @@ class DashboardAuditSink:
                         "args": event.args,
                         "action": event.action,
                         "reason": event.reason,
+                        "call_id": event.call_id,
                     },
                     self.api_key,
                 )

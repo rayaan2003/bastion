@@ -68,7 +68,7 @@ def test_policy_and_tool_still_see_raw_args():
         pass
     else:
         raise AssertionError("policy should still see the raw card number")
-    assert [e.args for e in events] == [
+    assert [e.args for e in events if e.action != "completed"] == [
         {"q": "ssn [REDACTED:ssn_us]"},
         {"q": "card [REDACTED:credit_card]"},
     ]

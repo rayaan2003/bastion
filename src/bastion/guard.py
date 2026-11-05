@@ -10,12 +10,14 @@ from __future__ import annotations
 
 import functools
 import inspect
+import uuid
 from collections.abc import Callable, Iterable
 from typing import Any
 
 from bastion.approval import ApprovalHandler, ConsoleApprovalHandler
 from bastion.audit import AuditLogger
 from bastion.policy import Action, PolicyEngine
+from bastion.scanning import redact
 
 
 class BlockedByPolicy(Exception):
@@ -32,9 +34,13 @@ def evaluate_and_record(
     policy: PolicyEngine,
     audit: AuditLogger,
     approval_handler: ApprovalHandler,
+    call_id: str | None = None,
 ) -> tuple[bool, str]:
     """Evaluate policy for a tool call, consult the approval handler if the
     rule says to, and record the outcome to the audit log either way.
+
+    Every event is recorded under `call_id` (generated if omitted); pass the
+    same id to `record_outcome()` once an allowed tool has run.
 
     Returns (allowed, reason). Shared by `guard()` and the framework
     integrations (LangGraph wraps tools directly so doesn't need this;
@@ -43,28 +49,50 @@ def evaluate_and_record(
     allowed — raise, return an error string, etc. — differs per framework,
     so that decision is left to the caller.
     """
+    call_id = call_id or str(uuid.uuid4())
     decision = policy.evaluate(tool_name, args)
 
+    def record(action: str, reason: str) -> None:
+        audit.record(tool_name, args, action, reason, call_id=call_id)
+
     if decision.shadow is not None:
-        audit.record(
-            tool_name, args, f"would_{decision.shadow.action.value}", decision.shadow.reason
-        )
+        record(f"would_{decision.shadow.action.value}", decision.shadow.reason)
 
     if decision.action == Action.BLOCK:
-        audit.record(tool_name, args, "blocked", decision.reason)
+        record("blocked", decision.reason)
         return False, decision.reason
 
     if decision.action == Action.APPROVE:
         approved = approval_handler.request_approval(tool_name, args, decision.reason)
         if not approved:
-            reason = f"approval denied ({decision.reason})"
-            audit.record(tool_name, args, "denied", decision.reason)
-            return False, reason
-        audit.record(tool_name, args, "approved", decision.reason)
+            record("denied", decision.reason)
+            return False, f"approval denied ({decision.reason})"
+        record("approved", decision.reason)
         return True, decision.reason
 
-    audit.record(tool_name, args, "allowed", decision.reason)
+    record("allowed", decision.reason)
     return True, decision.reason
+
+
+_MAX_ERROR_LENGTH = 1000
+
+
+def record_outcome(
+    audit: AuditLogger, tool_name: str, call_id: str, error: str | None = None
+) -> None:
+    """Record that an allowed tool call has run: `completed` if it returned,
+    `failed` with `error` if it raised."""
+    if error is None:
+        audit.record(tool_name, {}, "completed", "", call_id=call_id)
+        return
+    # Exception text can quote the very args the log redacts.
+    if audit.redact_args:
+        error = redact(error)
+    audit.record(tool_name, {}, "failed", error[:_MAX_ERROR_LENGTH], call_id=call_id)
+
+
+def describe_error(error: BaseException) -> str:
+    return f"{type(error).__name__}: {error}"
 
 
 def guard(
@@ -80,33 +108,53 @@ def guard(
     On call: build an args dict from the call, evaluate the policy, then
     ALLOW (call through), BLOCK (raise BlockedByPolicy), or APPROVE (ask the
     approval_handler; proceed if approved, else raise BlockedByPolicy).
-    Every outcome is recorded via `audit`.
+    Every decision is recorded via `audit`, and so is whether an allowed call
+    then completed or raised.
     """
     name: str = tool_name if tool_name is not None else getattr(fn, "__name__", "unknown_tool")
     audit = audit or AuditLogger()
     approval_handler = approval_handler or ConsoleApprovalHandler()
 
-    def enforce(args: tuple[Any, ...], kwargs: dict[str, Any]) -> None:
+    def enforce(args: tuple[Any, ...], kwargs: dict[str, Any]) -> str:
+        call_id = str(uuid.uuid4())
         call_args = _build_args_dict(fn, args, kwargs)
         allowed, reason = evaluate_and_record(
-            name, call_args, policy=policy, audit=audit, approval_handler=approval_handler
+            name,
+            call_args,
+            policy=policy,
+            audit=audit,
+            approval_handler=approval_handler,
+            call_id=call_id,
         )
         if not allowed:
             raise BlockedByPolicy(name, reason)
+        return call_id
 
     if inspect.iscoroutinefunction(fn):
 
         @functools.wraps(fn)
         async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
-            enforce(args, kwargs)
-            return await fn(*args, **kwargs)
+            call_id = enforce(args, kwargs)
+            try:
+                result = await fn(*args, **kwargs)
+            except Exception as e:
+                record_outcome(audit, name, call_id, describe_error(e))
+                raise
+            record_outcome(audit, name, call_id)
+            return result
 
         return async_wrapper
 
     @functools.wraps(fn)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
-        enforce(args, kwargs)
-        return fn(*args, **kwargs)
+        call_id = enforce(args, kwargs)
+        try:
+            result = fn(*args, **kwargs)
+        except Exception as e:
+            record_outcome(audit, name, call_id, describe_error(e))
+            raise
+        record_outcome(audit, name, call_id)
+        return result
 
     return wrapper
 

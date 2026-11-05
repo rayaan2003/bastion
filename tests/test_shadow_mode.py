@@ -18,8 +18,14 @@ class RecordingApprover(ApprovalHandler):
 
 
 def _audit() -> tuple[AuditLogger, list[tuple[str, str]]]:
+    # Decisions only; completed/failed outcomes are covered in test_guard.py.
     events: list[tuple[str, str]] = []
-    return AuditLogger(sink=lambda e: events.append((e.action, e.reason))), events
+
+    def sink(e):
+        if e.action not in ("completed", "failed"):
+            events.append((e.action, e.reason))
+
+    return AuditLogger(sink=sink), events
 
 
 def delete_user(user_id: str) -> str:

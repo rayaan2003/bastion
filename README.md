@@ -138,7 +138,10 @@ tool_node = guarded_tool_node([search_docs, send_email], policy=policy)
 ```
 
 **OpenAI Agents SDK** — wraps `@function_tool` tools. A blocked call returns
-`"Tool call blocked by policy: <reason>"` as the tool result.
+`"Tool call blocked by policy: <reason>"` as the tool result. The SDK turns
+tool exceptions into a result string by default, so those are audited as
+`completed`; use `@function_tool(failure_error_function=None)` to have them
+raise and be audited as `failed`.
 
 ```python
 from bastion.integrations.openai_agents import guarded_tools
@@ -146,16 +149,16 @@ from bastion.integrations.openai_agents import guarded_tools
 agent = Agent(name="support", tools=guarded_tools([search_docs, send_email], policy=policy))
 ```
 
-**Claude Agent SDK** — a `PreToolUse` hook. It sees every tool call,
-built-in (Bash, Write, ...) and MCP alike, including tools pre-allowed by
-`allowed_tools` and under `permission_mode="bypassPermissions"`. A blocked
+**Claude Agent SDK** — SDK hooks. The `PreToolUse` hook sees every tool
+call, built-in (Bash, Write, ...) and MCP alike, including tools pre-allowed
+by `allowed_tools` and under `permission_mode="bypassPermissions"`. A blocked
 call is denied with the reason; an allowed one is left to the SDK's normal
 permission checks. If the hook itself fails, the call is blocked.
 
 ```python
-from bastion.integrations.claude_agent_sdk import guarded_pre_tool_use
+from bastion.integrations.claude_agent_sdk import guarded_hooks
 
-options = ClaudeAgentOptions(hooks={"PreToolUse": [guarded_pre_tool_use(policy=policy)]})
+options = ClaudeAgentOptions(hooks=guarded_hooks(policy=policy))
 ```
 
 Keep the hook's `timeout` (default 600s) above your approval handler's,
@@ -198,12 +201,16 @@ Every decision is recorded. By default it's appended to
   "tool_name": "delete_customer",
   "args": {"customer_id": "cus_9"},
   "action": "blocked",
-  "reason": "irreversible"
+  "reason": "irreversible",
+  "call_id": "0b7e3f0c-5a1d-4a8e-9c63-2f5e1d7b9a44"
 }
 ```
 
 `action` is one of `allowed`, `blocked`, `approved`, `denied`, or
-`would_*` for shadow rules.
+`would_*` for shadow rules. Once an allowed call has run, a second event
+records `completed` (the tool returned) or `failed` (it raised, with the
+error). Every event about one call shares a `call_id` — the framework's own
+tool-call id where there is one — and the dashboard links them.
 
 PII and secrets in args are masked in the log
 (`"ssn [REDACTED:ssn_us]"`) using the [scanner](#piisecrets-scanning).

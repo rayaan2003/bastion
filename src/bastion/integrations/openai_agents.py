@@ -15,6 +15,11 @@ string as the tool's result (`"Tool call blocked by policy: <reason>"`),
 same idiom the SDK itself uses for a tool that raised an exception, so the
 model sees why and can react instead of the run crashing.
 
+Each call's outcome is audited as `completed` or `failed`. By default the
+SDK's `@function_tool` turns an exception into an error-string result
+(`failure_error_function`), so such errors show up as `completed`; pass
+`failure_error_function=None` to have them raise and be audited as `failed`.
+
 Note: `ApprovalHandler.request_approval` is synchronous/blocking (same
 interface used by the console, Slack and dashboard handlers). The Agents
 SDK's tool invocation is async, so an approval wait here blocks the event
@@ -28,12 +33,13 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import uuid
 from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any
 
 from bastion.approval import ApprovalHandler, ConsoleApprovalHandler
 from bastion.audit import AuditLogger
-from bastion.guard import evaluate_and_record
+from bastion.guard import describe_error, evaluate_and_record, record_outcome
 from bastion.policy import PolicyEngine
 
 if TYPE_CHECKING:
@@ -93,12 +99,24 @@ def _guard_function_tool(
         except (TypeError, ValueError):
             call_args = {"_raw": input_str}
 
+        call_id = getattr(ctx, "tool_call_id", None) or str(uuid.uuid4())
         allowed, reason = evaluate_and_record(
-            tool_name, call_args, policy=policy, audit=audit, approval_handler=approval_handler
+            tool_name,
+            call_args,
+            policy=policy,
+            audit=audit,
+            approval_handler=approval_handler,
+            call_id=call_id,
         )
         if not allowed:
             return f"Tool call blocked by policy: {reason}"
 
-        return await original_invoke(ctx, input_str)
+        try:
+            result = await original_invoke(ctx, input_str)
+        except Exception as e:
+            record_outcome(audit, tool_name, call_id, describe_error(e))
+            raise
+        record_outcome(audit, tool_name, call_id)
+        return result
 
     return dataclasses.replace(tool, on_invoke_tool=guarded_invoke)

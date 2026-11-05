@@ -12,18 +12,26 @@ const ACTION_COLORS: Record<string, string> = {
   would_block: "text-amber-400",
   would_approve: "text-amber-400",
   would_allow: "text-amber-400",
+  completed: "text-neutral-400",
+  failed: "text-orange-400",
 };
 
 export default async function AuditPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tool_name?: string; action?: string; session_id?: string }>;
+  searchParams: Promise<{
+    tool_name?: string;
+    action?: string;
+    session_id?: string;
+    call_id?: string;
+  }>;
 }) {
   const params = await searchParams;
   const events = await listEvents({
     toolName: params.tool_name || undefined,
     action: params.action || undefined,
     sessionId: params.session_id || undefined,
+    callId: params.call_id || undefined,
   });
 
   return (
@@ -50,11 +58,19 @@ export default async function AuditPage({
           <option value="would_block">would_block (shadow)</option>
           <option value="would_approve">would_approve (shadow)</option>
           <option value="would_allow">would_allow (shadow)</option>
+          <option value="completed">completed</option>
+          <option value="failed">failed</option>
         </select>
         <input
           name="session_id"
           defaultValue={params.session_id ?? ""}
           placeholder="session id"
+          className="bg-neutral-900 border border-neutral-700 rounded px-3 py-1.5"
+        />
+        <input
+          name="call_id"
+          defaultValue={params.call_id ?? ""}
+          placeholder="call id"
           className="bg-neutral-900 border border-neutral-700 rounded px-3 py-1.5"
         />
         <button
@@ -77,6 +93,7 @@ export default async function AuditPage({
               <th className="py-2 pr-4">Reason</th>
               <th className="py-2 pr-4">Args</th>
               <th className="py-2 pr-4">Session</th>
+              <th className="py-2 pr-4">Call</th>
             </tr>
           </thead>
           <tbody>
@@ -95,6 +112,17 @@ export default async function AuditPage({
                 </td>
                 <td className="py-2 pr-4 text-neutral-500 font-mono text-xs">
                   {event.session_id.slice(0, 8)}
+                </td>
+                <td className="py-2 pr-4 font-mono text-xs">
+                  {event.call_id ? (
+                    <a
+                      href={`/audit?call_id=${encodeURIComponent(event.call_id)}`}
+                      className="text-neutral-500 hover:text-neutral-300 underline"
+                      title="All events for this call"
+                    >
+                      {event.call_id.slice(0, 8)}
+                    </a>
+                  ) : null}
                 </td>
               </tr>
             ))}
