@@ -88,7 +88,7 @@ outage. Revisit (local spool + retry) if guaranteed delivery is needed.
 | plain `guard()` | `BlockedByPolicy` raised |
 | LangGraph | `BlockedByPolicy`, caught by `ToolNode(handle_tool_errors=BlockedByPolicy)` → error `ToolMessage` |
 | OpenAI Agents SDK | the string `"Tool call blocked by policy: <reason>"` — raising would be swallowed into a generic error message by the SDK, losing the reason |
-| Claude Agent SDK | `PermissionResultDeny(message=...)` from `can_use_tool`, which the SDK calls for every tool, built-in or MCP |
+| Claude Agent SDK | `PermissionResultDeny(message=...)` from `can_use_tool` — built-in and MCP tools alike, but the SDK skips the callback for tools pre-allowed via `allowed_tools`/settings and under `bypassPermissions` |
 
 **LangChain tools are guarded on both `.func` and `.coroutine`.** `ainvoke`
 calls `.coroutine` directly when it's set, so wrapping only `.func` would

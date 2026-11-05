@@ -1,290 +1,276 @@
-<div align="center">
+# bastion
 
-<img width="100%" src="https://capsule-render.vercel.app/api?type=waving&color=0:1a1a2e,100:16213e&height=200&section=header&text=bastion&fontSize=70&fontColor=ffffff&desc=A%20firewall%20for%20what%20your%20AI%20agents%20are%20allowed%20to%20do&descSize=18&descAlignY=62&animation=fadeIn" alt="bastion"/>
-
-<img src="https://readme-typing-svg.demolab.com/?font=Fira+Code&size=18&pause=1200&color=5B8DEF&center=true&vCenter=true&width=600&lines=Block+a+tool+call+before+it+runs.;Require+a+human+for+the+risky+ones.;Audit+every+decision%2C+for+free." alt="Typing SVG" />
-
-<br/>
-
-[![CI](https://github.com/rayaan2003/bastion/actions/workflows/ci.yml/badge.svg)](https://github.com/rayaan2003/bastion/actions/workflows/ci.yml)
-[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white)](pyproject.toml)
-[![Type checked: mypy strict](https://img.shields.io/badge/mypy-strict-2A6DB2.svg)](pyproject.toml)
 [![PyPI](https://img.shields.io/pypi/v/bastionguard.svg)](https://pypi.org/project/bastionguard/)
+[![CI](https://github.com/rayaan2003/bastion/actions/workflows/ci.yml/badge.svg)](https://github.com/rayaan2003/bastion/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/pypi/pyversions/bastionguard.svg)](https://pypi.org/project/bastionguard/)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
-**[Quickstart](#quickstart)** · **[Framework integrations](#framework-integrations)** · **[Dashboard](#dashboard)** · **[Live demo](https://bastion-dashboard-two.vercel.app)** · **[Why](#why)**
+Policy enforcement for AI agent tool calls. Before a tool runs, bastion
+decides whether the agent may call it, needs a human to approve it, or is
+blocked — and logs the decision.
 
-</div>
-
----
-
-## Why
-
-AI agents are shipping fast and getting real permissions — deleting
-records, sending emails, moving money, running shell commands. Most teams
-have zero enforcement between "the model decided to call a tool" and "the
-tool ran." bastion sits in that gap:
-
-```
- agent decides to call a tool
-          │
-          ▼
-    ┌──────────┐      allow    ──▶  tool runs
-    │ bastion  │      block    ──▶  denied, agent sees why
-    │  policy  │      approve  ──▶  human reviews (Slack / dashboard / console)
-    └──────────┘
-          │
-          ▼
-   every decision logged
-```
-
-Not another prompt-injection classifier — enforcement on what agents are
-actually allowed to **do**.
-
-## What you get
-
-| | |
-|---|---|
-| 🛡️ **Policy engine** | Allow / block / require-approval rules, glob-matched tool names, conditions on args (`amount > 500`, regex match, contains-PII, ...) |
-| 👀 **Shadow mode** | Audit what a rule *would* do against real traffic before enforcing it — per rule or for the whole policy |
-| ✅ **Human-in-the-loop** | Console prompt, Slack (reaction-based, no webhook server), or the hosted dashboard — pluggable |
-| 📝 **Audit log, for free** | Every decision recorded automatically — JSONL locally or shipped to the dashboard |
-| 🔍 **PII/secrets scanning** | Regex-based (no ML model to download) — emails, SSNs, Luhn-validated credit cards, cloud credentials, private keys |
-| 📄 **Declarative policy** | Rules in YAML, editable by a non-engineer reviewer — by hand or from the dashboard's `/policy` page |
-| 🔌 **3 framework integrations** | LangGraph, OpenAI Agents SDK, Claude Agent SDK — one line to wrap your tools |
-| 📊 **Dashboard** | Audit log, approval queue, and a policy editor — a real Next.js app |
-
-## Quickstart
-
-> `pip install bastionguard` — the PyPI distribution is named `bastionguard`
-> (plain `bastion` was already taken — an old Python 2 stdlib module, of
-> all things). The import name is unaffected: still `import bastion`.
+It runs in your agent's process, works with LangGraph, the OpenAI Agents
+SDK and the Claude Agent SDK, and has no dependencies beyond PyYAML.
 
 ```python
-from bastion import PolicyEngine, Rule, Action, guard
+from bastion import Action, PolicyEngine, Rule, guard
 from bastion.policy import arg_exceeds
 
 policy = PolicyEngine()
-policy.add_rule(Rule(tool_pattern="delete_*", action=Action.BLOCK, reason="irreversible"))
+policy.add_rule(Rule("delete_*", Action.BLOCK, reason="irreversible"))
 policy.add_rule(Rule(
-    tool_pattern="transfer_funds",
-    action=Action.APPROVE,
-    condition=arg_exceeds("amount", 500),
-    reason="large transfers need a human",
+    "refund",
+    Action.APPROVE,
+    condition=arg_exceeds("amount", 100),
+    reason="refunds over $100 need a human",
 ))
 
-def transfer_funds(account: str, amount: float) -> str:
-    return f"sent ${amount} to {account}"
-
-guarded = guard(transfer_funds, policy=policy)
-guarded(account="acct_1", amount=600)  # prompts for approval in the terminal
+refund = guard(refund, policy=policy)
+delete_customer = guard(delete_customer, policy=policy)
 ```
+
+```text
+>>> refund(order_id="ord_1", amount=40)
+'refunded $40 on ord_1'
+>>> refund(order_id="ord_2", amount=250)       # reviewer says no
+BlockedByPolicy: Tool call 'refund' blocked by policy: approval denied (refunds over $100 need a human)
+>>> delete_customer(customer_id="cus_9")
+BlockedByPolicy: Tool call 'delete_customer' blocked by policy: irreversible
+```
+
+## Install
 
 ```bash
-python examples/basic_example.py   # runs the full demo above
+pip install bastionguard
 ```
 
-Rules can also live in YAML instead of hand-written Python:
+The package is `bastionguard` on PyPI; the import is `bastion`. Framework
+and Slack support are extras:
+
+```bash
+pip install "bastionguard[langgraph]"          # or openai-agents, claude-agent-sdk, slack
+```
+
+Python 3.10+.
+
+## Policies
+
+A policy is an ordered list of rules. Each rule matches a tool name (glob
+pattern) and, optionally, a condition on the call's arguments. The first
+matching rule decides; if nothing matches, `default_action` applies
+(`allow` unless you set it).
+
+| Action | Effect |
+|---|---|
+| `allow` | the tool runs |
+| `block` | the tool doesn't run; the agent gets the reason |
+| `approve` | an approval handler asks a human; runs only if approved |
+
+Policies can live in YAML, so they can be reviewed without reading Python:
+
+```yaml
+# policy.yaml
+default_action: allow
+
+rules:
+  - name: no-deletes
+    tool: "delete_*"
+    action: block
+    reason: irreversible
+
+  # Allow-list by ordering: internal mail goes through, anything else needs a human.
+  - tool: send_email
+    action: allow
+    condition: { type: arg_matches_regex, arg: to, pattern: '^[^@\s]+@yourco\.com$' }
+  - tool: send_email
+    action: approve
+    reason: external recipient
+
+  - tool: "*"
+    action: block
+    reason: arguments contain PII or credentials
+    condition: { type: contains_pii, categories: [ssn_us, credit_card, aws_secret_access_key] }
+```
 
 ```python
 from bastion import load_policy_from_yaml
 policy = load_policy_from_yaml("policy.yaml")
 ```
 
-See [`examples/policy.yaml`](examples/policy.yaml) for the schema.
+Built-in conditions:
 
-### Shadow mode — roll out without breaking anything
+| YAML `type` | Python | Matches when |
+|---|---|---|
+| `arg_exceeds` | `arg_exceeds(arg, threshold)` | the argument is a number above `threshold` |
+| `arg_matches_regex` | `arg_matches_regex(arg, pattern)` | the argument matches `pattern` |
+| `any_arg_contains` | `any_arg_contains(substrings)` | any argument contains one of `substrings` (case-insensitive) |
+| `contains_pii` | `contains_pii(categories)` | any argument contains a detected [PII/secret](#piisecrets-scanning) |
 
-Turn bastion on against real traffic before it's allowed to block anything.
-Shadow rules are evaluated and audited as `would_block` / `would_approve` /
-`would_allow`, but never enforced — and never page a human:
+In Python, a condition is any `Callable[[dict], bool]` over the arguments.
 
-```python
-policy = PolicyEngine(shadow=True)          # whole policy: enforce nothing yet
-policy.add_rule(Rule(tool_pattern="delete_*", action=Action.BLOCK, reason="irreversible"))
+### Shadow mode
 
-# or trial one new rule inside an already-enforced policy:
-policy.add_rule(Rule(tool_pattern="send_*", action=Action.APPROVE, shadow=True))
-```
+Run a policy against real traffic before it's allowed to block anything.
+Shadow rules are evaluated and logged as `would_block`, `would_approve` or
+`would_allow`, but not enforced, and they never ask a human.
 
 ```yaml
-shadow: true            # whole policy
+shadow: true          # the whole policy
 rules:
   - tool: "send_*"
     action: approve
-    shadow: true        # or just this rule
+    shadow: true      # or a single rule inside an enforced policy
 ```
 
-A shadow rule can't change the enforced outcome: evaluation skips past it
-to the real rules behind it, and a shadow rule whose condition raises is
-logged and ignored. Filter the dashboard's audit log by `would_*` to see
-what turning it on would do.
+A shadow rule can't change what's enforced: evaluation moves past it to the
+rules behind it.
 
-## Framework integrations
+## Frameworks
 
-<details>
-<summary><b>LangGraph</b></summary>
+**LangGraph** — a drop-in replacement for `ToolNode`. A blocked call comes
+back as an error `ToolMessage`, so the agent can react instead of the graph
+crashing. Sync and async tools are both covered.
 
 ```python
 from bastion.integrations.langgraph import guarded_tool_node
 
-tool_node = guarded_tool_node([my_tool_a, my_tool_b], policy=policy)
-# use tool_node exactly where you'd use langgraph.prebuilt.ToolNode(tools)
+tool_node = guarded_tool_node([search_docs, send_email], policy=policy)
 ```
 
-A blocked or approval-denied call comes back as a normal error `ToolMessage`
-(`handle_tool_errors=BlockedByPolicy`), so the agent can react to it instead
-of the graph run crashing. See [`examples/langgraph_demo.py`](examples/langgraph_demo.py).
-
-```bash
-pip install "bastionguard[langgraph]"
-```
-</details>
-
-<details>
-<summary><b>OpenAI Agents SDK</b></summary>
+**OpenAI Agents SDK** — wraps `@function_tool` tools. A blocked call returns
+`"Tool call blocked by policy: <reason>"` as the tool result.
 
 ```python
 from bastion.integrations.openai_agents import guarded_tools
 
-agent = Agent(name="...", tools=guarded_tools([my_tool_a, my_tool_b], policy=policy))
+agent = Agent(name="support", tools=guarded_tools([search_docs, send_email], policy=policy))
 ```
 
-A blocked or approval-denied call returns a descriptive string as the
-tool's result (`"Tool call blocked by policy: <reason>"`) rather than
-raising — the same idiom the SDK itself uses when a tool raises an
-exception, so the model sees why and can react. See
-[`examples/openai_agents_demo.py`](examples/openai_agents_demo.py).
-
-```bash
-pip install "bastionguard[openai-agents]"
-```
-</details>
-
-<details>
-<summary><b>Claude Agent SDK</b></summary>
+**Claude Agent SDK** — a `can_use_tool` callback, covering built-in tools
+(Bash, Write, ...) and MCP tools alike, with nothing wrapped per tool. The
+SDK skips the callback for tools already allowed by `allowed_tools` or a
+settings file, and for everything under `permission_mode="bypassPermissions"`,
+so don't combine those with bastion.
 
 ```python
-from claude_agent_sdk import ClaudeAgentOptions
 from bastion.integrations.claude_agent_sdk import guarded_can_use_tool
 
 options = ClaudeAgentOptions(can_use_tool=guarded_can_use_tool(policy=policy))
 ```
 
-Hooks into the SDK's own permission system (`can_use_tool`), which it calls
-for **every** tool invocation — built-in tools (Bash, Read, Write, ...) and
-custom tools registered via `create_sdk_mcp_server` alike. Unlike the other
-two integrations, nothing needs wrapping per-tool — one callback covers
-everything. See [`examples/claude_agent_sdk_demo.py`](examples/claude_agent_sdk_demo.py).
+**Anything else** — `guard(fn, policy=...)` wraps any callable, sync or
+async, and raises `BlockedByPolicy`.
 
-```bash
-pip install "bastionguard[claude-agent-sdk]"
-```
-</details>
+Runnable versions of each are in [`examples/`](examples).
 
-## PII / secrets scanning
+## Approvals
 
-```python
-from bastion import Rule, Action, contains_pii, enforce_text_policy
-
-policy.add_rule(Rule(
-    tool_pattern="*",
-    action=Action.BLOCK,
-    condition=contains_pii(["ssn_us", "credit_card"]),
-    reason="tool call args contain PII/secrets",
-))
-
-# directly on an LLM response, outside the tool-call path:
-enforce_text_policy(llm_output, categories=["email"], on_detect="redact")
-```
-
-Also available as a YAML condition type (`type: contains_pii`). See
-[`examples/pii_scanning_example.py`](examples/pii_scanning_example.py).
-
-## Slack approval
+`approve` rules call an `ApprovalHandler`. The default prompts in the
+terminal. The Slack and dashboard handlers deny if nobody answers before
+the timeout.
 
 ```python
 from bastion.approval.slack import SlackApprovalHandler
 
-approval_handler = SlackApprovalHandler(
-    token="xoxb-...",       # needs chat:write + reactions:read scopes
-    channel="#agent-approvals",
-)
+# Posts to the channel and waits for a ✅ or ❌ reaction. Needs a bot token
+# with chat:write and reactions:read; no webhook server.
+approvals = SlackApprovalHandler(token="xoxb-...", channel="#agent-approvals", timeout=300)
+guarded = guard(refund, policy=policy, approval_handler=approvals)
 ```
 
-Posts a message and polls for a ✅/❌ reaction — no webhook server required.
-Fails closed (denies) if nobody responds within `timeout` seconds.
+The [dashboard](#dashboard) provides an approval queue as well
+(`DashboardApprovalHandler`). For your own channel, subclass
+`ApprovalHandler` and implement `request_approval(tool_name, args, reason) -> bool`.
+
+## Audit log
+
+Every decision is recorded. By default it's appended to
+`bastion_audit.jsonl`:
+
+```json
+{
+  "id": "5c183b31-6364-4dca-b154-599220c73ba3",
+  "timestamp": 1793897709.573623,
+  "session_id": "sess_7f3a",
+  "tool_name": "delete_customer",
+  "args": {"customer_id": "cus_9"},
+  "action": "blocked",
+  "reason": "irreversible"
+}
+```
+
+`action` is one of `allowed`, `blocked`, `approved`, `denied`, or
+`would_*` for shadow rules. To send events elsewhere, pass any
+`Callable[[AuditEvent], None]`:
+
+```python
+from bastion import AuditLogger
+audit = AuditLogger(session_id="run-42", sink=my_sink)
+guarded = guard(refund, policy=policy, audit=audit)
+```
+
+## PII/secrets scanning
+
+Regex detectors for `email`, `phone_us`, `ssn_us`, `credit_card` (Luhn
+checked), `aws_access_key_id`, `aws_secret_access_key`, `generic_api_key`
+(OpenAI, GitHub, Slack token formats) and `private_key_block`. Use them as
+a policy condition (`contains_pii`, above), or directly on any text such as
+a model response:
+
+```python
+from bastion import enforce_text_policy
+
+safe = enforce_text_policy(llm_output, categories=["email", "ssn_us"], on_detect="redact")
+# "contact [REDACTED:email]"
+```
+
+These are patterns, not a DLP classifier: they catch the common, expensive
+leaks and will miss things.
 
 ## Dashboard
 
-<div align="center">
-<a href="https://bastion-dashboard-two.vercel.app"><b>→ Live demo</b></a>
-</div>
-
-A real Next.js app (`dashboard/`) — audit log, approval queue, and a
-policy editor, all wired to the SDK over HTTP:
+[`dashboard/`](dashboard) is a self-hosted Next.js + Postgres app with an
+audit log viewer, an approval queue and a policy editor. The SDK talks to
+it over HTTP with an API key:
 
 ```python
-from bastion import AuditLogger, guard
 from bastion.dashboard import (
     DashboardApprovalHandler,
     dashboard_audit_sink,
     load_policy_from_dashboard,
 )
 
-api_key = "..."  # must match DASHBOARD_API_KEY in the dashboard's env
-policy = load_policy_from_dashboard("http://localhost:3000", api_key)
-audit = AuditLogger(sink=dashboard_audit_sink("http://localhost:3000", api_key))
-approval_handler = DashboardApprovalHandler("http://localhost:3000", api_key)
+url, key = "https://bastion.yourco.internal", "..."
+policy = load_policy_from_dashboard(url, key)
+audit = AuditLogger(sink=dashboard_audit_sink(url, key))
+approvals = DashboardApprovalHandler(url, key)
 ```
 
-Audit events ship on a background thread, so a slow or unreachable
-dashboard never blocks or fails a tool call — failures are logged on the
-`bastion` logger, and pending events are flushed at exit.
+Audit events are sent on a background thread, so a slow or unreachable
+dashboard doesn't hold up tool calls. Setup and deployment:
+[dashboard/README.md](dashboard/README.md).
 
-The dashboard UI is behind a separate session login (not this API key) —
-see [`dashboard/README.md`](dashboard/README.md) for the full auth model
-and self-hosting setup.
+## Status
 
-## Install
+Pre-1.0: the API may still change between minor versions, and changes are
+listed in [CHANGELOG.md](CHANGELOG.md). Next up is in
+[docs/roadmap.md](docs/roadmap.md), and how it's built is in
+[docs/architecture.md](docs/architecture.md).
 
-```bash
-pip install bastionguard
-# with a framework integration:
-pip install "bastionguard[langgraph]"   # or [openai-agents] / [claude-agent-sdk]
-# with Slack approval:
-pip install "bastionguard[slack]"
-```
+Known limitations:
 
-For local development (editable install, running the test suite), see
-[CONTRIBUTING.md](CONTRIBUTING.md).
-
-## Tests
-
-```bash
-ruff check . && mypy src && pytest -q
-```
-
-Framework integration tests run against the **real installed package** for
-each framework, never a mock — see [AGENTS.md](AGENTS.md) for why that's a
-hard rule here.
-
-## Project status
-
-Pre-1.0. Core SDK, all three framework integrations, and the dashboard are
-built and tested — see [CHANGELOG.md](CHANGELOG.md) for what's shipped and
-[docs/roadmap.md](docs/roadmap.md) for what's next.
+- Approval handlers are synchronous, so with the async SDKs a pending
+  approval blocks the event loop.
+- The dashboard has one shared login and one API key; there are no users
+  or projects yet.
+- The Claude Agent SDK integration is bypassed for pre-allowed tools (see
+  [Frameworks](#frameworks)).
 
 ## Contributing
 
-Issues and PRs welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). Found a
-security issue? See [SECURITY.md](SECURITY.md) instead of opening a public
-issue for it.
+Issues and PRs are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). Report
+security issues privately as described in [SECURITY.md](SECURITY.md).
 
 ## License
 
 [Apache 2.0](LICENSE)
-
-<div align="center">
-<img width="100%" src="https://capsule-render.vercel.app/api?type=waving&color=0:16213e,100:1a1a2e&height=100&section=footer" alt=""/>
-</div>
