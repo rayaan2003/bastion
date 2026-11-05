@@ -210,6 +210,10 @@ audit = AuditLogger(sink=dashboard_audit_sink("http://localhost:3000", api_key))
 approval_handler = DashboardApprovalHandler("http://localhost:3000", api_key)
 ```
 
+Audit events ship on a background thread, so a slow or unreachable
+dashboard never blocks or fails a tool call — failures are logged on the
+`bastion` logger, and pending events are flushed at exit.
+
 The dashboard UI is behind a separate session login (not this API key) —
 see [`dashboard/README.md`](dashboard/README.md) for the full auth model
 and self-hosting setup.

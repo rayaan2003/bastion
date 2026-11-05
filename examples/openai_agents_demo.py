@@ -1,6 +1,6 @@
 """OpenAI Agents SDK demo — guarded tools wired into an Agent.
 
-Requires: pip install bastion[openai-agents]
+Requires: pip install bastionguard[openai-agents]
 
 Running the full agent loop needs an OpenAI API key (Runner.run calls the
 model). This script shows the wiring; see tests/test_openai_agents_integration.py
@@ -14,7 +14,7 @@ from agents import Agent, function_tool
 
 from bastion import Action, AuditLogger, PolicyEngine, Rule
 from bastion.integrations.openai_agents import guarded_tools
-from bastion.policy import any_arg_contains
+from bastion.policy import arg_matches_regex
 
 
 @function_tool
@@ -42,11 +42,17 @@ def build_agent() -> Agent:
         action=Action.BLOCK,
         reason="irreversible action, blocked by default policy",
     ))
+    # First match wins: internal recipients go straight through, anyone else
+    # needs a human. An allow-list, not a deny-list of "bad" addresses.
+    policy.add_rule(Rule(
+        tool_pattern="send_email",
+        action=Action.ALLOW,
+        condition=arg_matches_regex("to", r"^[^@\s]+@example\.com$"),
+    ))
     policy.add_rule(Rule(
         tool_pattern="send_email",
         action=Action.APPROVE,
-        condition=any_arg_contains(["all-staff", "external"]),
-        reason="broad-distribution emails require approval",
+        reason="email to a recipient outside example.com requires approval",
     ))
 
     audit = AuditLogger(log_path="examples/openai_agents_audit.jsonl")

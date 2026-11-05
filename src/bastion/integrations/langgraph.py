@@ -11,7 +11,7 @@ Usage:
     tool_node = guarded_tool_node([my_tool_a, my_tool_b], policy=policy)
     # use tool_node in your StateGraph exactly as you would ToolNode(tools)
 
-Requires the `langgraph` extra: pip install bastion[langgraph]
+Requires the `langgraph` extra: pip install bastionguard[langgraph]
 """
 
 from __future__ import annotations
@@ -52,7 +52,7 @@ def guarded_tool_node(
     except ImportError as e:
         raise ImportError(
             "langgraph is required for this integration. "
-            "Install with: pip install bastion[langgraph]"
+            "Install with: pip install bastionguard[langgraph]"
         ) from e
 
     wrapped_tools = guard_tools(

@@ -1,10 +1,8 @@
 """Human-in-the-loop approval for tool calls flagged Action.APPROVE.
 
-ApprovalHandler is the pluggable interface. ConsoleApprovalHandler is the v1
+ApprovalHandler is the pluggable interface. ConsoleApprovalHandler is the
 default (prompts in the terminal) so the SDK works standalone with zero
-external services. A SlackApprovalHandler (posts to a channel with
-Approve/Deny buttons and blocks until someone responds) is the next one to
-build — see NOTES.md build plan.
+external services. Slack and dashboard handlers live in bastion.integrations.
 """
 
 from __future__ import annotations

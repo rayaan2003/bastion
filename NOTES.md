@@ -102,6 +102,13 @@ Async log shipped to backend -> Dashboard (Next.js + Postgres)
   add` silently corrupting secrets with a trailing newline) so they don't
   get re-discovered from scratch next time.
 
+- 2026-11-05: Dashboard audit shipping fails open — a dashboard outage
+  logs a warning and drops events rather than blocking tool calls. Policy
+  enforcement is local and unaffected either way; making audit delivery a
+  hard dependency of every tool call was a reliability bug, not a security
+  feature. Revisit (e.g. local spool + retry) if a user needs guaranteed
+  delivery for compliance.
+
 ## Open questions
 
 - Naming for the product/repo — currently using placeholder name `bastion`

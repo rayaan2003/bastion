@@ -21,7 +21,7 @@ SDK's tool invocation is async, so an approval wait here blocks the event
 loop for its duration — fine for a single agent run, worth knowing if
 you're running many agents concurrently on one loop.
 
-Requires the `openai-agents` extra: pip install bastion[openai-agents]
+Requires the `openai-agents` extra: pip install bastionguard[openai-agents]
 """
 
 from __future__ import annotations
@@ -56,7 +56,7 @@ def guarded_tools(
     except ImportError as e:
         raise ImportError(
             "openai-agents is required for this integration. "
-            "Install with: pip install bastion[openai-agents]"
+            "Install with: pip install bastionguard[openai-agents]"
         ) from e
 
     audit = audit or AuditLogger()

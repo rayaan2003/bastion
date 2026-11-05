@@ -1,6 +1,6 @@
 """LangGraph demo — a tiny agent with a guarded tool node.
 
-Requires: pip install bastion[langgraph] langchain-openai (or any chat model)
+Requires: pip install bastionguard[langgraph] langchain-openai (or any chat model)
 
 Run: python examples/langgraph_demo.py
 """
@@ -10,7 +10,7 @@ from langgraph.graph import END, START, MessagesState, StateGraph
 
 from bastion import Action, AuditLogger, PolicyEngine, Rule
 from bastion.integrations.langgraph import guarded_tool_node
-from bastion.policy import any_arg_contains
+from bastion.policy import arg_matches_regex
 
 
 @tool
@@ -38,11 +38,17 @@ def build_graph():
         action=Action.BLOCK,
         reason="irreversible action, blocked by default policy",
     ))
+    # First match wins: internal recipients go straight through, anyone else
+    # needs a human. An allow-list, not a deny-list of "bad" addresses.
+    policy.add_rule(Rule(
+        tool_pattern="send_email",
+        action=Action.ALLOW,
+        condition=arg_matches_regex("to", r"^[^@\s]+@example\.com$"),
+    ))
     policy.add_rule(Rule(
         tool_pattern="send_email",
         action=Action.APPROVE,
-        condition=any_arg_contains(["all-staff", "external"]),
-        reason="broad-distribution emails require approval",
+        reason="email to a recipient outside example.com requires approval",
     ))
 
     audit = AuditLogger(log_path="examples/langgraph_audit.jsonl")

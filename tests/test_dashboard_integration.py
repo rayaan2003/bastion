@@ -1,6 +1,10 @@
 import json
+import logging
+import subprocess
+import sys
 import threading
-import urllib.error
+import time
+from datetime import datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import pytest
@@ -117,39 +121,66 @@ def fake_server():
     server.shutdown()
 
 
+def _event(**overrides) -> AuditEvent:
+    fields = {
+        "id": "evt-1",
+        "timestamp": 123.0,
+        "session_id": "sess-1",
+        "tool_name": "delete_user",
+        "args": {"id": "u1"},
+        "action": "blocked",
+        "reason": "irreversible",
+    }
+    return AuditEvent(**{**fields, **overrides})
+
+
 def test_dashboard_audit_sink_posts_event(fake_server):
     sink = dashboard_audit_sink(fake_server.base_url, _API_KEY)
-    event = AuditEvent(
-        id="evt-1",
-        timestamp=123.0,
-        session_id="sess-1",
-        tool_name="delete_user",
-        args={"id": "u1"},
-        action="blocked",
-        reason="irreversible",
-    )
-    sink(event)
+    sink(_event())
+    assert sink.flush(timeout=5)
 
     assert len(fake_server.received_events) == 1
     assert fake_server.received_events[0]["tool_name"] == "delete_user"
     assert fake_server.received_events[0]["action"] == "blocked"
 
 
-def test_dashboard_audit_sink_rejects_wrong_api_key(fake_server):
+def test_dashboard_audit_sink_serializes_non_json_args(fake_server):
+    sink = dashboard_audit_sink(fake_server.base_url, _API_KEY)
+    sink(_event(args={"when": datetime(2026, 1, 2, 3, 4, 5)}))
+    assert sink.flush(timeout=5)
+
+    assert fake_server.received_events[0]["args"] == {"when": "2026-01-02 03:04:05"}
+
+
+def test_dashboard_audit_sink_logs_instead_of_raising_on_wrong_api_key(fake_server, caplog):
     sink = dashboard_audit_sink(fake_server.base_url, "wrong-key")
-    event = AuditEvent(
-        id="evt-1",
-        timestamp=123.0,
-        session_id="sess-1",
-        tool_name="delete_user",
-        args={},
-        action="blocked",
-        reason="irreversible",
-    )
-    with pytest.raises(urllib.error.HTTPError) as exc_info:
-        sink(event)
-    assert exc_info.value.code == 401
+    with caplog.at_level(logging.WARNING, logger="bastion"):
+        sink(_event())
+        assert sink.flush(timeout=5)
+
     assert fake_server.received_events == []
+    assert "failed to ship audit event evt-1" in caplog.text
+
+
+def test_dashboard_audit_sink_does_not_block_or_raise_when_dashboard_is_down():
+    # Port 9 (discard) on localhost: nothing listening, connection refused.
+    sink = dashboard_audit_sink("http://127.0.0.1:9", _API_KEY)
+    start = time.monotonic()
+    sink(_event())
+    assert time.monotonic() - start < 0.1
+    assert sink.flush(timeout=15)
+
+
+def test_dashboard_audit_sink_flushes_pending_events_at_exit(fake_server):
+    script = (
+        "from bastion.audit import AuditLogger\n"
+        "from bastion.integrations.dashboard import dashboard_audit_sink\n"
+        f"audit = AuditLogger(sink=dashboard_audit_sink({fake_server.base_url!r}, {_API_KEY!r}))\n"
+        "audit.record('send_email', {}, 'allowed', 'ok')\n"
+    )
+    subprocess.run([sys.executable, "-c", script], check=True, timeout=30)
+
+    assert [e["tool_name"] for e in fake_server.received_events] == ["send_email"]
 
 
 def test_dashboard_approval_handler_polls_until_approved(fake_server):

@@ -19,7 +19,7 @@ per-tool; one callback covers everything. (The SDK only invokes
 `can_use_tool` according to its own `permission_mode` semantics — consult
 the SDK's docs for how that interacts with built-in auto-allow rules.)
 
-Requires the `claude-agent-sdk` extra: pip install bastion[claude-agent-sdk]
+Requires the `claude-agent-sdk` extra: pip install bastionguard[claude-agent-sdk]
 """
 
 from __future__ import annotations
@@ -47,7 +47,7 @@ def guarded_can_use_tool(
     except ImportError as e:
         raise ImportError(
             "claude-agent-sdk is required for this integration. "
-            "Install with: pip install bastion[claude-agent-sdk]"
+            "Install with: pip install bastionguard[claude-agent-sdk]"
         ) from e
 
     audit = audit or AuditLogger()
