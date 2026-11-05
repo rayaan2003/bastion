@@ -16,6 +16,11 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Changed
 
+- **Module moves (breaking imports):**
+  `bastion.integrations.slack` → `bastion.approval.slack`,
+  `bastion.integrations.dashboard` → `bastion.dashboard`.
+  `bastion.integrations` now holds agent-framework adapters only.
+  `from bastion.approval import ApprovalHandler` is unchanged.
 - `Decision.reason` is now a field rather than a computed property, and
   the no-match reason names the real default (`default block`, not always
   `default allow`).

@@ -1,6 +1,6 @@
 from typing import Any
 
-from bastion.integrations.slack import SlackApprovalHandler
+from bastion.approval.slack import SlackApprovalHandler
 
 
 class FakeSlackClient:

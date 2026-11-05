@@ -10,7 +10,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 import pytest
 
 from bastion.audit import AuditEvent
-from bastion.integrations.dashboard import (
+from bastion.dashboard import (
     DashboardApprovalHandler,
     dashboard_audit_sink,
     load_policy_from_dashboard,
@@ -174,7 +174,7 @@ def test_dashboard_audit_sink_does_not_block_or_raise_when_dashboard_is_down():
 def test_dashboard_audit_sink_flushes_pending_events_at_exit(fake_server):
     script = (
         "from bastion.audit import AuditLogger\n"
-        "from bastion.integrations.dashboard import dashboard_audit_sink\n"
+        "from bastion.dashboard import dashboard_audit_sink\n"
         f"audit = AuditLogger(sink=dashboard_audit_sink({fake_server.base_url!r}, {_API_KEY!r}))\n"
         "audit.record('send_email', {}, 'allowed', 'ok')\n"
     )

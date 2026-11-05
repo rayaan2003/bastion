@@ -7,9 +7,9 @@ Instructions for any AI agent (or human) working in this repository.
 `bastion` — a Python SDK that enforces policy on AI agent tool calls
 (allow/block/require-approval) and produces an audit log, plus a Next.js
 dashboard (`dashboard/`) for viewing that log and managing approvals/policy
-through a UI. See [NOTES.md](NOTES.md) for product context and
-[PLAN.md](PLAN.md) for the current roadmap and task list. See
-[CONTRIBUTING.md](CONTRIBUTING.md) for the contributor-facing version of
+through a UI. See [docs/architecture.md](docs/architecture.md) for how
+it's built and why, and [docs/roadmap.md](docs/roadmap.md) for what's next.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the contributor-facing version of
 this file.
 
 ## Non-negotiables
@@ -21,7 +21,7 @@ this file.
   config flags, or "just in case" parameters for things nothing calls yet.
 - **No placeholder/stub code presented as done.** If something isn't
   implemented, it doesn't exist in the codebase — it's a line item in
-  PLAN.md, not a function that raises `NotImplementedError` or returns a
+  docs/roadmap.md, not a function that raises `NotImplementedError` or returns a
   fake value.
 - **Every change must pass the full check before it's considered done:**
   ```
@@ -38,29 +38,33 @@ this file.
 ## Project layout
 
 ```
-src/bastion/          the package (installed as `bastion`)
-  policy.py               policy engine: Rule, PolicyEngine, Action, conditions
-  guard.py                wraps callables/tools with policy enforcement;
-                           evaluate_and_record() is the shared policy/audit/
-                           approval core every integration below reuses
-  approval.py              human-in-the-loop approval handlers
-  audit.py                 audit event logging
-  config.py                declarative YAML policy loading
+src/bastion/              the package (PyPI: `bastionguard`, import: `bastion`)
+  policy.py                 Rule, PolicyEngine, Decision, condition helpers
+  config.py                 declarative YAML policy loading
+  guard.py                  evaluate_and_record() — the one policy/audit/
+                            approval core every integration reuses — plus
+                            guard()/guard_tools() for callables and LangChain tools
+  audit.py                  AuditEvent, AuditLogger, JSONL sink
   scanning.py               regex-based PII/secrets detection
-  integrations/
-    langgraph.py            guarded_tool_node()
-    openai_agents.py         guarded_tools()
-    claude_agent_sdk.py       guarded_can_use_tool()
+  dashboard.py              HTTP client for dashboard/ (audit sink, approvals, policy)
+  approval/                 approval channels
+    __init__.py               ApprovalHandler, ConsoleApprovalHandler, AutoDenyHandler
     slack.py                  SlackApprovalHandler
-    dashboard.py              talks to dashboard/'s HTTP API
+  integrations/             agent-framework adapters only
+    langgraph.py              guarded_tool_node()
+    openai_agents.py          guarded_tools()
+    claude_agent_sdk.py       guarded_can_use_tool()
+tests/                    pytest suite, one file per module — framework tests
+                          run against the real installed package, never a mock
 examples/                 runnable, dependency-minimal demos (one per integration)
-tests/                    pytest suite, mirrors src/bastion structure —
-                           framework integration tests run against the real
-                           installed package, never a mock of its API
+docs/                     architecture.md (how and why), roadmap.md (what's next)
 dashboard/                Next.js + Postgres app; see dashboard/README.md
-                           and dashboard/AGENTS.md (deployment-specific)
-.github/workflows/ci.yml  lint + typecheck + test on push/PR
+.github/workflows/        ci.yml (Python + dashboard checks), publish.yml (PyPI on release)
 ```
+
+New approval channels go in `approval/`, new audit destinations are a
+`Sink` callable, new framework adapters go in `integrations/` — see
+docs/architecture.md "Where new things go".
 
 When adding a new framework integration:
 1. It goes under `src/bastion/integrations/<framework>.py` and imports
@@ -70,7 +74,7 @@ When adding a new framework integration:
 2. **Inspect the real, installed package's current API before writing
    anything against it** — don't rely on a remembered or guessed API.
    Every integration in this repo found at least one real bug this way
-   (see PLAN.md's history for specifics). Write a throwaway script that
+   (see CHANGELOG.md for specifics). Write a throwaway script that
    imports the package and prints `dir()` / `inspect.signature()` on the
    relevant types first.
 3. Reuse `evaluate_and_record()` from `guard.py` for the actual policy/
@@ -97,8 +101,14 @@ pip install -e ".[dev,langgraph,slack,openai-agents,claude-agent-sdk]"
 2. `mypy src` — zero errors
 3. `pytest -q` — all passing, and add tests for new behavior in the same
    change, not as a follow-up
-4. If you changed product direction, scope, or architecture, update
-   [NOTES.md](NOTES.md) (context/history) and [PLAN.md](PLAN.md) (what's
-   next) in the same change — don't let the docs drift from the code.
+4. Add a CHANGELOG.md entry under `[Unreleased]`. If you changed
+   architecture or a design decision, update docs/architecture.md; if you
+   finished or reprioritised roadmap work, update docs/roadmap.md — in the
+   same change, so docs don't drift from the code.
 5. Don't commit generated artifacts (`*.jsonl` audit logs, `.venv/`,
    `__pycache__/`) — `.gitignore` already excludes these, keep it that way.
+
+## Commits and PRs
+
+Commits are authored by the human maintainer only — no `Co-Authored-By`
+trailers for AI tools and no "Generated with ..." lines in PR descriptions.

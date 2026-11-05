@@ -204,7 +204,7 @@ Also available as a YAML condition type (`type: contains_pii`). See
 ## Slack approval
 
 ```python
-from bastion.integrations.slack import SlackApprovalHandler
+from bastion.approval.slack import SlackApprovalHandler
 
 approval_handler = SlackApprovalHandler(
     token="xoxb-...",       # needs chat:write + reactions:read scopes
@@ -226,7 +226,7 @@ policy editor, all wired to the SDK over HTTP:
 
 ```python
 from bastion import AuditLogger, guard
-from bastion.integrations.dashboard import (
+from bastion.dashboard import (
     DashboardApprovalHandler,
     dashboard_audit_sink,
     load_policy_from_dashboard,
@@ -273,7 +273,7 @@ hard rule here.
 
 Pre-1.0. Core SDK, all three framework integrations, and the dashboard are
 built and tested — see [CHANGELOG.md](CHANGELOG.md) for what's shipped and
-[PLAN.md](PLAN.md) for what's next.
+[docs/roadmap.md](docs/roadmap.md) for what's next.
 
 ## Contributing
 

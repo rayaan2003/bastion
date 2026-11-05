@@ -5,7 +5,7 @@ runtime dependency, fast enough to run inline on every call. This catches
 the common, costly leaks (emails, SSNs, credit card numbers, cloud
 credentials, private keys) with a fixed false-negative rate — it is not a
 substitute for a proper DLP classifier. Swap in something heavier later if
-that rate becomes a problem in practice; see PLAN.md.
+that rate becomes a problem in practice.
 """
 
 from __future__ import annotations

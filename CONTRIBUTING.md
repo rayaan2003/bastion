@@ -32,8 +32,9 @@ comments/abstractions). The short version:
   *real* installed package (inspect its actual current API, test against
   it directly) rather than against a remembered or guessed API — this
   project's integrations have each found real bugs that way.
-- Update [NOTES.md](NOTES.md) / [PLAN.md](PLAN.md) if you change product
-  direction or architecture, so the docs don't drift from the code.
+- Add a [CHANGELOG.md](CHANGELOG.md) entry under `[Unreleased]`, and update
+  [docs/architecture.md](docs/architecture.md) if you change a design
+  decision, so the docs don't drift from the code.
 
 ## Dashboard changes
 
@@ -41,6 +42,7 @@ The `dashboard/` app has its own checks:
 
 ```bash
 cd dashboard
+npm ci
 npx eslint .
 npm run build
 ```
