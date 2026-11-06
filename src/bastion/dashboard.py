@@ -18,7 +18,7 @@ import time
 import urllib.request
 from typing import Any
 
-from bastion.approval import ApprovalHandler
+from bastion.approval import ApprovalDecision, ApprovalHandler, ApprovalRequest
 from bastion.audit import AuditEvent
 from bastion.config import policy_from_yaml_string
 from bastion.policy import PolicyEngine
@@ -104,6 +104,7 @@ class DashboardAuditSink:
                         "action": event.action,
                         "reason": event.reason,
                         "call_id": event.call_id,
+                        "approver": event.approver,
                     },
                     self.api_key,
                 )
@@ -163,10 +164,16 @@ class DashboardApprovalHandler(ApprovalHandler):
         self.poll_interval = poll_interval
         self.timeout = timeout
 
-    def request_approval(self, tool_name: str, args: dict[str, Any], reason: str) -> bool:
+    def request_approval(self, request: ApprovalRequest) -> ApprovalDecision:
         created = _post_json(
             f"{self.base_url}/api/approvals",
-            {"tool_name": tool_name, "args": args, "reason": reason},
+            {
+                "tool_name": request.tool_name,
+                "args": request.args,
+                "reason": request.reason,
+                "call_id": request.call_id,
+                "session_id": request.session_id,
+            },
             self.api_key,
         )
         approval_id = created["id"]
@@ -174,10 +181,14 @@ class DashboardApprovalHandler(ApprovalHandler):
         deadline = time.monotonic() + self.timeout
         while time.monotonic() < deadline:
             current = _get_json(f"{self.base_url}/api/approvals/{approval_id}", self.api_key)
-            if current["status"] == "approved":
-                return True
-            if current["status"] == "denied":
-                return False
+            if current["status"] in ("approved", "denied"):
+                # The dashboard has one shared login, so it can say where the
+                # decision was made ("ui" / "api") but not which person made it.
+                where = current.get("decided_by") or "unknown"
+                return ApprovalDecision(
+                    approved=current["status"] == "approved", approver=f"dashboard:{where}"
+                )
             time.sleep(self.poll_interval)
 
-        return False  # fail closed: no reviewer response within timeout = denied
+        # Fail closed: no reviewer response within timeout = denied.
+        return ApprovalDecision(approved=False)

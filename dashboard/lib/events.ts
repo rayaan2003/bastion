@@ -9,6 +9,7 @@ export interface AuditEvent {
   action: string;
   reason: string;
   call_id: string | null;
+  approver: string | null;
   created_at: string;
 }
 
@@ -21,13 +22,15 @@ export interface NewAuditEvent {
   action: string;
   reason: string;
   call_id: string | null;
+  approver: string | null;
 }
 
 export async function insertEvent(event: NewAuditEvent): Promise<void> {
   const db = await getDb();
   await db.query(
-    `INSERT INTO audit_events (id, "timestamp", session_id, tool_name, args, action, reason, call_id)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    `INSERT INTO audit_events
+       (id, "timestamp", session_id, tool_name, args, action, reason, call_id, approver)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      ON CONFLICT (id) DO NOTHING`,
     [
       event.id,
@@ -38,6 +41,7 @@ export async function insertEvent(event: NewAuditEvent): Promise<void> {
       event.action,
       event.reason,
       event.call_id,
+      event.approver,
     ]
   );
 }

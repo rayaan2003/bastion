@@ -1,4 +1,9 @@
-from bastion.approval import ApprovalHandler, ConsoleApprovalHandler
+from bastion.approval import (
+    ApprovalDecision,
+    ApprovalHandler,
+    ApprovalRequest,
+    ConsoleApprovalHandler,
+)
 from bastion.audit import AuditLogger
 from bastion.config import PolicyConfigError, load_policy_from_yaml
 from bastion.guard import guard, guard_tools
@@ -13,7 +18,9 @@ from bastion.scanning import (
 
 __all__ = [
     "Action",
+    "ApprovalDecision",
     "ApprovalHandler",
+    "ApprovalRequest",
     "AuditLogger",
     "ConsoleApprovalHandler",
     "PolicyConfigError",

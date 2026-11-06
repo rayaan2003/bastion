@@ -14,7 +14,7 @@ import uuid
 from collections.abc import Callable, Iterable
 from typing import Any
 
-from bastion.approval import ApprovalHandler, ConsoleApprovalHandler
+from bastion.approval import ApprovalHandler, ApprovalRequest, ConsoleApprovalHandler
 from bastion.audit import AuditLogger
 from bastion.policy import Action, PolicyEngine
 from bastion.scanning import redact
@@ -52,8 +52,8 @@ def evaluate_and_record(
     call_id = call_id or str(uuid.uuid4())
     decision = policy.evaluate(tool_name, args)
 
-    def record(action: str, reason: str) -> None:
-        audit.record(tool_name, args, action, reason, call_id=call_id)
+    def record(action: str, reason: str, approver: str = "") -> None:
+        audit.record(tool_name, args, action, reason, call_id=call_id, approver=approver)
 
     if decision.shadow is not None:
         record(f"would_{decision.shadow.action.value}", decision.shadow.reason)
@@ -63,11 +63,19 @@ def evaluate_and_record(
         return False, decision.reason
 
     if decision.action == Action.APPROVE:
-        approved = approval_handler.request_approval(tool_name, args, decision.reason)
-        if not approved:
-            record("denied", decision.reason)
+        answer = approval_handler.request_approval(
+            ApprovalRequest(
+                tool_name=tool_name,
+                args=args,
+                reason=decision.reason,
+                call_id=call_id,
+                session_id=audit.session_id,
+            )
+        )
+        if not answer.approved:
+            record("denied", decision.reason, answer.approver)
             return False, f"approval denied ({decision.reason})"
-        record("approved", decision.reason)
+        record("approved", decision.reason, answer.approver)
         return True, decision.reason
 
     record("allowed", decision.reason)

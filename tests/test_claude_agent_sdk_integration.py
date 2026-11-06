@@ -20,7 +20,7 @@ from claude_agent_sdk import (  # noqa: E402
 )
 
 from bastion import Action, AuditLogger, PolicyEngine, Rule  # noqa: E402
-from bastion.approval import ApprovalHandler  # noqa: E402
+from bastion.approval import ApprovalDecision, ApprovalHandler  # noqa: E402
 from bastion.integrations.claude_agent_sdk import (  # noqa: E402
     guarded_can_use_tool,
     guarded_hooks,
@@ -28,13 +28,13 @@ from bastion.integrations.claude_agent_sdk import (  # noqa: E402
 
 
 class AlwaysApprove(ApprovalHandler):
-    def request_approval(self, tool_name, args, reason):
-        return True
+    def request_approval(self, request):
+        return ApprovalDecision(approved=True, approver="test:approver")
 
 
 class AlwaysDeny(ApprovalHandler):
-    def request_approval(self, tool_name, args, reason):
-        return False
+    def request_approval(self, request):
+        return ApprovalDecision(approved=False, approver="test:denier")
 
 
 def call(can_use_tool, tool_name: str, input_data: dict):
@@ -216,9 +216,9 @@ def test_hook_runs_approval_off_the_event_loop_thread():
     seen: list[bool] = []
 
     class RecordsThread(ApprovalHandler):
-        def request_approval(self, tool_name, args, reason):
+        def request_approval(self, request):
             seen.append(threading.current_thread() is threading.main_thread())
-            return True
+            return ApprovalDecision(approved=True)
 
     policy = PolicyEngine().add_rule(Rule(tool_pattern="*", action=Action.APPROVE))
     run_hook(_hook(policy, RecordsThread()), "Bash", {"command": "ls"})

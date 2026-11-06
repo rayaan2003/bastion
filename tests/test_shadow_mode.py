@@ -3,7 +3,7 @@ import logging
 import pytest
 
 from bastion import Action, AuditLogger, PolicyEngine, Rule, guard
-from bastion.approval import ApprovalHandler
+from bastion.approval import ApprovalDecision, ApprovalHandler
 from bastion.config import PolicyConfigError, policy_from_yaml_string
 from bastion.guard import BlockedByPolicy
 
@@ -12,9 +12,9 @@ class RecordingApprover(ApprovalHandler):
     def __init__(self) -> None:
         self.calls: list[str] = []
 
-    def request_approval(self, tool_name, args, reason):
-        self.calls.append(tool_name)
-        return True
+    def request_approval(self, request):
+        self.calls.append(request.tool_name)
+        return ApprovalDecision(approved=True)
 
 
 def _audit() -> tuple[AuditLogger, list[tuple[str, str]]]:

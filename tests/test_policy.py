@@ -1,7 +1,7 @@
 import pytest
 
 from bastion import Action, AuditLogger, PolicyEngine, Rule, guard
-from bastion.approval import ApprovalHandler
+from bastion.approval import ApprovalDecision, ApprovalHandler
 from bastion.guard import BlockedByPolicy
 from bastion.policy import any_arg_contains, arg_exceeds
 
@@ -11,13 +11,13 @@ def make_audit(tmp_path):
 
 
 class AlwaysApprove(ApprovalHandler):
-    def request_approval(self, tool_name, args, reason):
-        return True
+    def request_approval(self, request):
+        return ApprovalDecision(approved=True, approver="test:approver")
 
 
 class AlwaysDeny(ApprovalHandler):
-    def request_approval(self, tool_name, args, reason):
-        return False
+    def request_approval(self, request):
+        return ApprovalDecision(approved=False, approver="test:denier")
 
 
 def test_default_allow(tmp_path):

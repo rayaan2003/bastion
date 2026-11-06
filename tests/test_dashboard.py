@@ -9,6 +9,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import pytest
 
+from bastion.approval import ApprovalDecision, ApprovalRequest
 from bastion.audit import AuditEvent
 from bastion.dashboard import (
     DashboardApprovalHandler,
@@ -102,6 +103,7 @@ class _FakeDashboardServer:
                     server.get_counts[approval_id] = server.get_counts.get(approval_id, 0) + 1
                     if server.get_counts[approval_id] >= server.approve_after:
                         server.approvals[approval_id]["status"] = "approved"
+                        server.approvals[approval_id]["decided_by"] = "ui"
                     self._send_json(200, server.approvals[approval_id])
                     return
 
@@ -142,6 +144,8 @@ def test_dashboard_audit_sink_posts_event(fake_server):
     assert len(fake_server.received_events) == 1
     assert fake_server.received_events[0]["tool_name"] == "delete_user"
     assert fake_server.received_events[0]["action"] == "blocked"
+    assert fake_server.received_events[0]["call_id"] == ""
+    assert fake_server.received_events[0]["approver"] == ""
 
 
 def test_dashboard_audit_sink_serializes_non_json_args(fake_server):
@@ -183,12 +187,25 @@ def test_dashboard_audit_sink_flushes_pending_events_at_exit(fake_server):
     assert [e["tool_name"] for e in fake_server.received_events] == ["send_email"]
 
 
+def _approval_request() -> ApprovalRequest:
+    return ApprovalRequest(
+        tool_name="transfer_funds",
+        args={"amount": 600},
+        reason="large transfer",
+        call_id="call-9",
+        session_id="sess-1",
+    )
+
+
 def test_dashboard_approval_handler_polls_until_approved(fake_server):
     handler = DashboardApprovalHandler(
         fake_server.base_url, _API_KEY, poll_interval=0.01, timeout=5
     )
-    result = handler.request_approval("transfer_funds", {"amount": 600}, "large transfer")
-    assert result is True
+    decision = handler.request_approval(_approval_request())
+
+    assert decision == ApprovalDecision(approved=True, approver="dashboard:ui")
+    [created] = fake_server.approvals.values()
+    assert (created["call_id"], created["session_id"]) == ("call-9", "sess-1")
 
 
 def test_dashboard_approval_handler_denies_on_timeout():
@@ -197,8 +214,8 @@ def test_dashboard_approval_handler_denies_on_timeout():
         handler = DashboardApprovalHandler(
             server.base_url, _API_KEY, poll_interval=0.01, timeout=0.1
         )
-        result = handler.request_approval("transfer_funds", {"amount": 600}, "large transfer")
-        assert result is False
+        decision = handler.request_approval(_approval_request())
+        assert decision == ApprovalDecision(approved=False, approver="")
     finally:
         server.shutdown()
 

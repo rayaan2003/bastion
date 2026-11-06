@@ -6,14 +6,13 @@ What's next, in priority order. Shipped work moves to
 
 ## Next
 
-1. **Trustworthy audit log**
-   - record who approved or denied (Slack user, dashboard reviewer)
-   - link each approval to its session and audit event
+1. **Approval controls**
+   - Slack: restrict who may approve (an allow-list of user ids)
    - optional redaction of args shown in Slack/dashboard approval requests
 2. **Tamper-evident audit** — hash-chained events so gaps or edits are
    detectable.
-3. **Multi-user dashboard** — projects, per-project API keys, roles; SSO
-   after that.
+3. **Multi-user dashboard** — projects, per-project API keys, roles, and
+   named reviewers on approvals; SSO after that.
 4. **Async approvals** — an async `ApprovalHandler`, or worker-thread
    dispatch as the Claude Agent SDK hook does, so the OpenAI Agents
    integration doesn't block the event loop while waiting.
@@ -33,5 +32,6 @@ What's next, in priority order. Shipped work moves to
 - Shadow mode (log-only rollout), per rule or whole policy.
 - PII/secrets redacted in audit-logged args by default.
 - `call_id` links each call's decision and outcome (`completed`/`failed`).
+- Approvals record who decided (`approver`) and link to their call.
 - Claude Agent SDK enforcement via a `PreToolUse` hook, so pre-allowed tools
   and `bypassPermissions` no longer skip policy.

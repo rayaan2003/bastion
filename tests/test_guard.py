@@ -1,9 +1,15 @@
 import asyncio
+import contextlib
 
 import pytest
 
 from bastion import Action, AuditLogger, PolicyEngine, Rule, guard
-from bastion.approval import AutoDenyHandler
+from bastion.approval import (
+    ApprovalDecision,
+    ApprovalHandler,
+    ApprovalRequest,
+    AutoDenyHandler,
+)
 from bastion.audit import AuditEvent
 from bastion.guard import BlockedByPolicy
 
@@ -106,3 +112,50 @@ def test_record_generates_call_id_when_not_given():
     events: list[AuditEvent] = []
     AuditLogger(sink=events.append).record("t", {}, "allowed", "r")
     assert events[0].call_id
+
+
+class _Recording(ApprovalHandler):
+    def __init__(self, decision: ApprovalDecision) -> None:
+        self.decision = decision
+        self.requests: list[ApprovalRequest] = []
+
+    def request_approval(self, request: ApprovalRequest) -> ApprovalDecision:
+        self.requests.append(request)
+        return self.decision
+
+
+@pytest.mark.parametrize(
+    ("decision", "expected"),
+    [
+        (ApprovalDecision(approved=True, approver="slack:U1"), ["approved", "completed"]),
+        (ApprovalDecision(approved=False, approver="slack:U2"), ["denied"]),
+        (ApprovalDecision(approved=False), ["denied"]),
+    ],
+)
+def test_approver_is_audited_and_request_carries_the_call_ids(decision, expected):
+    handler = _Recording(decision)
+    events: list[AuditEvent] = []
+    policy = PolicyEngine().add_rule(Rule("refund", Action.APPROVE, reason="needs review"))
+
+    def refund(amount: int) -> str:
+        return "ok"
+
+    fn = guard(
+        refund,
+        policy=policy,
+        audit=AuditLogger(session_id="sess-7", sink=events.append),
+        approval_handler=handler,
+    )
+    with contextlib.suppress(BlockedByPolicy):
+        fn(amount=500)
+
+    assert _actions(events) == expected
+    assert events[0].approver == decision.approver
+    [request] = handler.requests
+    assert request == ApprovalRequest(
+        tool_name="refund",
+        args={"amount": 500},
+        reason="needs review",
+        call_id=events[0].call_id,
+        session_id="sess-7",
+    )

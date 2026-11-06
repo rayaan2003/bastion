@@ -105,6 +105,11 @@ export default async function AuditPage({
                 <td className="py-2 pr-4 font-mono">{event.tool_name}</td>
                 <td className={`py-2 pr-4 font-medium ${ACTION_COLORS[event.action] ?? ""}`}>
                   {event.action}
+                  {event.approver ? (
+                    <span className="block text-xs font-normal text-neutral-500">
+                      by {event.approver}
+                    </span>
+                  ) : null}
                 </td>
                 <td className="py-2 pr-4 text-neutral-400 max-w-xs truncate">{event.reason}</td>
                 <td className="py-2 pr-4 text-neutral-500 max-w-xs truncate font-mono text-xs">

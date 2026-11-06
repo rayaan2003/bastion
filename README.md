@@ -173,20 +173,34 @@ Runnable versions of each are in [`examples/`](examples).
 
 `approve` rules call an `ApprovalHandler`. The default prompts in the
 terminal. The Slack and dashboard handlers deny if nobody answers before
-the timeout.
+the timeout. Who decided is recorded on the audit event (`approver`):
+`slack:U024BE7LH`, `console:alice`, or `dashboard:ui`.
 
 ```python
 from bastion.approval.slack import SlackApprovalHandler
 
-# Posts to the channel and waits for a ✅ or ❌ reaction. Needs a bot token
-# with chat:write and reactions:read; no webhook server.
+# Posts to the channel and waits for a ✅ or ❌ reaction; a ❌ wins if both
+# appear. Needs a bot token with chat:write and reactions:read; no webhook
+# server.
 approvals = SlackApprovalHandler(token="xoxb-...", channel="#agent-approvals", timeout=300)
 guarded = guard(refund, policy=policy, approval_handler=approvals)
 ```
 
 The [dashboard](#dashboard) provides an approval queue as well
-(`DashboardApprovalHandler`). For your own channel, subclass
-`ApprovalHandler` and implement `request_approval(tool_name, args, reason) -> bool`.
+(`DashboardApprovalHandler`). It records where a decision was made, not
+who, since the dashboard has one shared login.
+
+For your own channel, subclass `ApprovalHandler`:
+
+```python
+from bastion import ApprovalDecision, ApprovalHandler, ApprovalRequest
+
+class TeamsApprovals(ApprovalHandler):
+    def request_approval(self, request: ApprovalRequest) -> ApprovalDecision:
+        # request has tool_name, args, reason, call_id, session_id
+        reviewer, ok = ask_teams(request)
+        return ApprovalDecision(approved=ok, approver=f"teams:{reviewer}")
+```
 
 ## Audit log
 
@@ -207,7 +221,8 @@ Every decision is recorded. By default it's appended to
 ```
 
 `action` is one of `allowed`, `blocked`, `approved`, `denied`, or
-`would_*` for shadow rules. Once an allowed call has run, a second event
+`would_*` for shadow rules; `approved` and `denied` events also carry
+`approver`. Once an allowed call has run, a second event
 records `completed` (the tool returned) or `failed` (it raised, with the
 error). Every event about one call shares a `call_id` — the framework's own
 tool-call id where there is one — and the dashboard links them.

@@ -124,6 +124,16 @@ anything. `guarded_can_use_tool()` remains for compatibility.
 calls `.coroutine` directly when it's set, so wrapping only `.func` would
 let every async invocation skip policy.
 
+**Approval handlers take a request object and return a decision object.**
+`request_approval(ApprovalRequest) -> ApprovalDecision` rather than loose
+arguments and a bool, so new fields (the request's `call_id`/`session_id`,
+the decision's `approver`) don't break every handler again. The request
+carries raw args, since a reviewer needs them. An empty `approver` means
+nobody decided (a timeout). The dashboard records where a decision was
+made (`ui`/`api`) rather than a person, because it has one shared login;
+named reviewers need the multi-user dashboard. Slack takes the first user
+to react, and a deny reaction wins over an approve.
+
 **`ApprovalHandler` is synchronous.** One interface for console, Slack and
 dashboard. The Claude Agent SDK hook runs it on a worker thread; the OpenAI
 Agents integration still calls it inline, so an approval wait blocks that
