@@ -48,3 +48,63 @@ jobs:
       - run: npm ci
       - run: npx eslint .
       - run: npm run build
+
+  # The real SDK against a running dashboard and Postgres, on a database left
+  # the way v0.1.0 wrote it, so the startup migrations are exercised too.
+  dashboard-e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      # Throwaway values for this job's own database and dashboard.
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+      DASHBOARD_PASSWORD: e2e-password
+      DASHBOARD_SESSION_SECRET: e2e-session-secret-not-used-anywhere-else
+      DASHBOARD_API_KEY: e2e-api-key
+      BASTION_E2E_URL: http://localhost:3000
+      BASTION_E2E_API_KEY: e2e-api-key
+      BASTION_E2E_PASSWORD: e2e-password
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # for the v0.1.0 tag
+      - name: Seed the database as v0.1.0 left it
+        run: |
+          git show v0.1.0:dashboard/lib/schema.sql | psql "$DATABASE_URL" -v ON_ERROR_STOP=1
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c \
+            "INSERT INTO audit_events (id, \"timestamp\", session_id, tool_name, args, action, reason)
+             VALUES ('legacy-1', 1, 'legacy-sess', 'legacy_tool', '{}', 'allowed', 'written by v0.1.0')"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+      - run: npm ci
+        working-directory: dashboard
+      - run: npm run build
+        working-directory: dashboard
+      - name: Start the dashboard
+        working-directory: dashboard
+        run: |
+          npx next start -p 3000 > "$RUNNER_TEMP/dashboard.log" 2>&1 &
+          for _ in $(seq 1 60); do
+            curl -sf -o /dev/null -H "Authorization: Bearer $DASHBOARD_API_KEY" \
+              http://localhost:3000/api/events && exit 0
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/dashboard.log"
+          exit 1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]"
+      - run: pytest tests/e2e -v
+      - name: Dashboard log
+        if: always()
+        run: cat "$RUNNER_TEMP/dashboard.log"

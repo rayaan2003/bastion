@@ -56,10 +56,12 @@ src/bastion/              the package (PyPI: `bastionguard`, import: `bastion`)
     claude_agent_sdk.py       guarded_can_use_tool()
 tests/                    pytest suite, one file per module — framework tests
                           run against the real installed package, never a mock
+  e2e/                      SDK against a running dashboard + Postgres; skipped
+                            unless BASTION_E2E_URL is set (CI's dashboard-e2e job)
 examples/                 runnable, dependency-minimal demos (one per integration)
 docs/                     architecture.md (how and why), roadmap.md (what's next)
 dashboard/                Next.js + Postgres app; see dashboard/README.md
-.github/workflows/        ci.yml (Python + dashboard checks), publish.yml (PyPI on release)
+.github/workflows/        ci.yml (Python, dashboard build, dashboard e2e), publish.yml (PyPI on release)
 ```
 
 New approval channels go in `approval/`, new audit destinations are a
