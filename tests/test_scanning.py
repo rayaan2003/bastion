@@ -108,3 +108,8 @@ def test_detects_aws_secret_in_env_var_assignment():
     text = "AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
     findings = scan_text(text, categories=["aws_secret_access_key"])
     assert [f.matched_text for f in findings] == ["wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"]
+
+
+def test_redacting_a_card_keeps_the_text_around_it():
+    assert redact("card 4111 1111 1111 1111 declined") == "card [REDACTED:credit_card] declined"
+    assert redact("4111-1111-1111-1111, then") == "[REDACTED:credit_card], then"

@@ -28,7 +28,7 @@ _DETECTORS: dict[str, re.Pattern[str]] = {
     "email": re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"),
     "phone_us": re.compile(r"\b(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b"),
     "ssn_us": re.compile(r"\b\d{3}-\d{2}-\d{4}\b"),
-    "credit_card": re.compile(r"\b(?:\d[ -]?){13,16}\b"),
+    "credit_card": re.compile(r"\b\d(?:[ -]?\d){12,15}\b"),
     "aws_access_key_id": re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b"),
     # A leading "=" is allowed so `AWS_SECRET_ACCESS_KEY=<key>` matches; a
     # trailing one isn't, since that's base64 padding on some longer blob.
