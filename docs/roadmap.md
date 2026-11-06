@@ -6,9 +6,8 @@ What's next, in priority order. Shipped work moves to
 
 ## Next
 
-1. **Approval controls**
-   - Slack: restrict who may approve (an allow-list of user ids)
-   - optional redaction of args shown in Slack/dashboard approval requests
+1. **Approval controls** — optional redaction of args shown in
+   Slack/dashboard approval requests.
 2. **Tamper-evident audit** — hash-chained events so gaps or edits are
    detectable.
 3. **Multi-user dashboard** — projects, per-project API keys, roles, and
@@ -33,3 +32,4 @@ What's next, in priority order. Shipped work moves to
 - Claude Agent SDK enforcement via a `PreToolUse` hook, so pre-allowed tools
   and `bypassPermissions` no longer skip policy.
 - Approval waits run off the event loop in every async integration.
+- Slack approver allow-list.
