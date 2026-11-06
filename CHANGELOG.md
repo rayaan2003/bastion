@@ -7,6 +7,16 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
+- **MCP proxy.** `bastion mcp-proxy --policy policy.yaml -- <server
+  command>` puts policy, approvals and the audit log in front of any stdio
+  MCP server, for any MCP client (Claude Desktop, Cursor, Claude Code),
+  with no code changes. Blocked calls get an error result the model can
+  read and never reach the server. Approvals go to Slack (`--approval
+  slack`) or the dashboard (`--approval dashboard`), and audit events to
+  `~/.bastion/audit.jsonl` or the dashboard. No new dependencies: it
+  relays JSON-RPC, so it supports both pre-2026 sessions and the
+  stateless 2026-07-28 protocol. Adds the `bastion` command.
+
 - **Slack approver allow-list.** `SlackApprovalHandler(approvers=[...])`
   takes Slack user ids; only their reactions count, approve or deny, and
   the message @-mentions them. Without it anyone in the channel can
@@ -75,6 +85,9 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   `default allow`).
 
 ### Fixed
+
+- Redacting a card number also removed the space or dash after it
+  (`"card 4111… declined"` → `"card [REDACTED:credit_card]declined"`).
 
 - **Policy bypass on async LangChain tools.** `guard_tools()` /
   `guarded_tool_node()` only wrapped a tool's `.func`, so a tool with a

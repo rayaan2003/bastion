@@ -12,9 +12,12 @@ What's next, in priority order. Shipped work moves to
    detectable.
 3. **Multi-user dashboard** — projects, per-project API keys, roles, and
    named reviewers on approvals; SSO after that.
-4. **Policy hot-reload** from the dashboard without restarting the agent.
-5. **Beyond Python** — a TypeScript SDK, or an MCP proxy that enforces
-   policy for any MCP client.
+4. **Policy hot-reload** from the dashboard without restarting the agent
+   (or the MCP proxy).
+5. **MCP proxy over HTTP** — Streamable HTTP transport for remote MCP
+   servers, alongside stdio; and one approval per multi-round
+   (`input_required`) tool call instead of one per round.
+6. **TypeScript SDK.**
 
 ## Not planned
 
@@ -33,3 +36,4 @@ What's next, in priority order. Shipped work moves to
   and `bypassPermissions` no longer skip policy.
 - Approval waits run off the event loop in every async integration.
 - Slack approver allow-list.
+- MCP proxy (stdio): policy for any MCP client without code changes.

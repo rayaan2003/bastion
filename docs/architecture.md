@@ -6,13 +6,14 @@ How bastion is put together and why. For what's planned, see
 ## Request path
 
 Everything that decides whether a tool call runs happens in the agent's own
-process. The dashboard is optional and only ever sees the result.
+process, or in the MCP proxy's when there's no agent code to wrap. The
+dashboard is optional and only ever sees the result.
 
 ```
-agent framework calls a tool
-        │
-        ▼
-integrations/<framework>.py         adapts the framework's tool hook
+agent framework calls a tool          MCP client sends tools/call
+        │                                     │
+        ▼                                     ▼
+integrations/<framework>.py         mcp_proxy.py (bastion mcp-proxy)
         │
         ▼
 guard.evaluate_and_record()         the one enforcement core
@@ -43,6 +44,8 @@ dashboard/  Next.js + Postgres: audit log, approval queue, policy editor
 | `scanning.py` | regex PII/secrets detectors, `contains_pii` condition |
 | `dashboard.py` | HTTP client for `dashboard/`: audit sink, approval handler, policy fetch |
 | `integrations/` | agent-framework adapters only |
+| `mcp_proxy.py` | stdio MCP proxy that checks `tools/call` and relays everything else |
+| `cli.py` | the `bastion` command (`bastion mcp-proxy`) |
 
 ### Where new things go
 
@@ -147,6 +150,32 @@ loop's default executor: the default pool is small and shared, the OpenAI
 Agents SDK runs sync tools on it, and a pending approval can hold a thread
 for minutes. More than 32 simultaneous pending approvals queue behind each
 other, not behind tool calls.
+
+**The MCP proxy relays JSON-RPC lines, not MCP SDK objects.** It only
+needs to recognise `tools/call`; everything else (resources, prompts,
+sampling, protocol versions it has never seen) passes through. That keeps
+it dependency-free and unaffected by SDK churn: mcp 2.x renamed `FastMCP`
+and made the protocol stateless (`server/discover`, a version in every
+request's `_meta`) without the proxy needing to change. Its rules:
+
+- Messages from the client are **re-encoded** before forwarding, so the
+  server parses exactly what was checked even if its JSON parser treats
+  duplicate keys or escapes differently from Python's.
+- Anything it can't read is **dropped**, not forwarded: unparseable lines,
+  a `tools/call` without an id, a batch containing a `tools/call` (batches
+  were removed from MCP in 2025-06-18).
+- A blocked call is answered by the proxy with an `isError` result, the
+  way MCP reports tool errors, so the model reads the reason. On
+  2026-07-28+ requests it includes `resultType: "complete"`, which those
+  clients require.
+- Each `tools/call` is decided in its own task, so a pending approval
+  doesn't hold up other messages. A call cancelled
+  (`notifications/cancelled`) while a human is deciding is never forwarded.
+- An `input_required` or task result isn't an outcome yet. The client's
+  retry is a new `tools/call` and is checked again, which with an
+  `approve` rule means asking again.
+- The terminal can't approve: stdin is the MCP connection. Approvals go to
+  Slack or the dashboard, or are denied.
 
 **Scanning is regex, not ML.** No model download or spaCy dependency, fast
 enough to run on every call. It catches the common, costly leaks and has a

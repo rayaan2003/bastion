@@ -53,11 +53,14 @@ src/bastion/              the package (PyPI: `bastionguard`, import: `bastion`)
   integrations/             agent-framework adapters only
     langgraph.py              guarded_tool_node()
     openai_agents.py          guarded_tools()
-    claude_agent_sdk.py       guarded_can_use_tool()
+    claude_agent_sdk.py       guarded_hooks(), guarded_can_use_tool()
+  mcp_proxy.py              stdio MCP proxy: checks tools/call, relays the rest
+  cli.py                    the `bastion` command (`bastion mcp-proxy`)
 tests/                    pytest suite, one file per module — framework tests
                           run against the real installed package, never a mock
   e2e/                      SDK against a running dashboard + Postgres; skipped
                             unless BASTION_E2E_URL is set (CI's dashboard-e2e job)
+  mcp_servers/              stdio MCP servers the proxy tests run behind it
 examples/                 runnable, dependency-minimal demos (one per integration)
 docs/                     architecture.md (how and why), roadmap.md (what's next)
 dashboard/                Next.js + Postgres app; see dashboard/README.md

@@ -38,12 +38,15 @@ Repository = "https://github.com/rayaan2003/bastion"
 Issues = "https://github.com/rayaan2003/bastion/issues"
 Changelog = "https://github.com/rayaan2003/bastion/blob/master/CHANGELOG.md"
 
+[project.scripts]
+bastion = "bastion.cli:main"
+
 [project.optional-dependencies]
 claude-agent-sdk = ["claude-agent-sdk>=0.1"]
 langgraph = ["langchain-core>=0.3", "langgraph>=0.2"]
 openai-agents = ["openai-agents>=0.1"]
 slack = ["slack_sdk>=3.27"]
-dev = ["pytest>=8.0", "ruff>=0.6", "mypy>=1.11", "types-PyYAML>=6.0"]
+dev = ["pytest>=8.0", "ruff>=0.6", "mypy>=1.11", "types-PyYAML>=6.0", "mcp>=2.3"]
 
 [build-system]
 requires = ["setuptools>=77", "wheel"]
