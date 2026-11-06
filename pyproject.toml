@@ -1,6 +1,6 @@
 [project]
 name = "bastionguard"
-version = "0.1.0"
+version = "0.2.0"
 description = "Runtime policy enforcement for AI agent tool calls — block, approve, or log unsafe actions before they execute."
 readme = "README.md"
 requires-python = ">=3.10"

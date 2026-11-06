@@ -5,6 +5,8 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-06
+
 ### Added
 
 - **MCP proxy.** `bastion mcp-proxy --policy policy.yaml -- <server
@@ -151,4 +153,6 @@ First published release.
 - Production tooling from day one: `ruff`, `mypy --strict`, `pytest`,
   GitHub Actions CI.
 
+[Unreleased]: https://github.com/rayaan2003/bastion/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/rayaan2003/bastion/releases/tag/v0.2.0
 [0.1.0]: https://github.com/rayaan2003/bastion/releases/tag/v0.1.0
