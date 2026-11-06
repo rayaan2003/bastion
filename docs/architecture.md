@@ -131,7 +131,10 @@ carries raw args, since a reviewer needs them. An empty `approver` means
 nobody decided (a timeout). The dashboard records where a decision was
 made (`ui`/`api`) rather than a person, because it has one shared login;
 named reviewers need the multi-user dashboard. Slack takes the first user
-to react, and a deny reaction wins over an approve.
+to react, and a deny reaction wins over an approve. With `approvers` set,
+reactions from anyone else are ignored, denies included: an outsider's ❌
+could otherwise veto every call, and an unlisted reaction carries no
+authority either way.
 
 **`ApprovalHandler` is synchronous; async callers wait for it on a
 thread.** One interface for console, Slack and dashboard, rather than a

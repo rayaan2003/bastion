@@ -7,6 +7,12 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
+- **Slack approver allow-list.** `SlackApprovalHandler(approvers=[...])`
+  takes Slack user ids; only their reactions count, approve or deny, and
+  the message @-mentions them. Without it anyone in the channel can
+  decide, as before. Reactions are now fetched with `full=True` so Slack
+  can't truncate the list of who reacted.
+
 - **Approval waits no longer block the event loop.** The OpenAI Agents
   integration, `guarded_can_use_tool()`, and async tools wrapped by
   `guard()` / `guard_tools()` / `guarded_tool_node()` now wait for a human

@@ -1,5 +1,7 @@
 from typing import Any
 
+import pytest
+
 from bastion.approval import ApprovalDecision, ApprovalRequest
 from bastion.approval.slack import SlackApprovalHandler
 
@@ -18,7 +20,8 @@ class FakeSlackClient:
         self.posted = {"channel": channel, "text": text}
         return {"ts": "123.456"}
 
-    def reactions_get(self, channel: str, timestamp: str) -> dict[str, Any]:
+    def reactions_get(self, channel: str, timestamp: str, full: bool = False) -> dict[str, Any]:
+        assert full, "without full=True Slack may truncate each reaction's users"
         index = min(self.poll_count, len(self.reaction_sequence) - 1)
         reactions = self.reaction_sequence[index]
         self.poll_count += 1
@@ -74,3 +77,43 @@ def test_denied_on_timeout_with_no_approver():
     client = FakeSlackClient([{}])
     decision = _handler(client, poll_interval=0.01, timeout=0.05).request_approval(_request())
     assert decision == ApprovalDecision(approved=False, approver="")
+
+
+def test_reactions_from_outside_the_approver_list_are_ignored():
+    client = FakeSlackClient([
+        {"white_check_mark": ["U0RANDOM"]},
+        {"white_check_mark": ["U0RANDOM", "U0LEAD"]},
+    ])
+    decision = _handler(client, approvers=["U0LEAD"]).request_approval(_request())
+
+    assert decision == ApprovalDecision(approved=True, approver="slack:U0LEAD")
+    assert client.poll_count == 2
+
+
+def test_deny_from_outside_the_approver_list_does_not_block():
+    client = FakeSlackClient([{"x": ["U0RANDOM"], "white_check_mark": ["U0LEAD"]}])
+    decision = _handler(client, approvers=["U0LEAD"]).request_approval(_request())
+    assert decision == ApprovalDecision(approved=True, approver="slack:U0LEAD")
+
+
+def test_only_outsiders_reacting_times_out_denied():
+    client = FakeSlackClient([{"white_check_mark": ["U0RANDOM"]}])
+    handler = _handler(client, approvers=["U0LEAD"], poll_interval=0.01, timeout=0.05)
+    assert handler.request_approval(_request()) == ApprovalDecision(approved=False, approver="")
+
+
+def test_message_mentions_the_allowed_approvers():
+    client = FakeSlackClient([{"white_check_mark": ["U0LEAD"]}])
+    _handler(client, approvers=["U0LEAD", "U0CTO"]).request_approval(_request())
+    assert client.posted is not None
+    assert "Only <@U0CTO>, <@U0LEAD> can decide." in client.posted["text"]
+
+
+def test_empty_approver_list_is_rejected():
+    with pytest.raises(ValueError, match="no one could approve"):
+        _handler(FakeSlackClient([{}]), approvers=[])
+
+
+def test_single_string_approver_is_rejected():
+    with pytest.raises(TypeError, match="list of user ids"):
+        _handler(FakeSlackClient([{}]), approvers="U0LEAD")

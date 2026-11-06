@@ -181,8 +181,14 @@ from bastion.approval.slack import SlackApprovalHandler
 
 # Posts to the channel and waits for a ✅ or ❌ reaction; a ❌ wins if both
 # appear. Needs a bot token with chat:write and reactions:read; no webhook
-# server.
-approvals = SlackApprovalHandler(token="xoxb-...", channel="#agent-approvals", timeout=300)
+# server. Only the listed user ids can decide; leave approvers out to let
+# anyone in the channel.
+approvals = SlackApprovalHandler(
+    token="xoxb-...",
+    channel="#agent-approvals",
+    approvers=["U024BE7LH", "U0G9QF9C6"],
+    timeout=300,
+)
 guarded = guard(refund, policy=policy, approval_handler=approvals)
 ```
 
