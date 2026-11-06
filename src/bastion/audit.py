@@ -30,6 +30,8 @@ class AuditEvent:
     # Shared by every event about one tool call: any would_* event, the
     # decision, and the completed/failed outcome.
     call_id: str = ""
+    # Who approved or denied, on `approved` / `denied` events.
+    approver: str = ""
 
 
 Sink = Callable[[AuditEvent], None]
@@ -88,6 +90,7 @@ class AuditLogger:
         reason: str,
         *,
         call_id: str | None = None,
+        approver: str = "",
     ) -> AuditEvent:
         event = AuditEvent(
             id=str(uuid.uuid4()),
@@ -98,6 +101,7 @@ class AuditLogger:
             action=action,
             reason=reason,
             call_id=call_id or str(uuid.uuid4()),
+            approver=approver,
         )
         self.sink(event)
         return event

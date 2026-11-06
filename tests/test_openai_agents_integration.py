@@ -13,18 +13,18 @@ from agents import function_tool  # noqa: E402
 from agents.tool_context import ToolContext  # noqa: E402
 
 from bastion import Action, AuditLogger, PolicyEngine, Rule  # noqa: E402
-from bastion.approval import ApprovalHandler  # noqa: E402
+from bastion.approval import ApprovalDecision, ApprovalHandler  # noqa: E402
 from bastion.integrations.openai_agents import guarded_tools  # noqa: E402
 
 
 class AlwaysApprove(ApprovalHandler):
-    def request_approval(self, tool_name, args, reason):
-        return True
+    def request_approval(self, request):
+        return ApprovalDecision(approved=True, approver="test:approver")
 
 
 class AlwaysDeny(ApprovalHandler):
-    def request_approval(self, tool_name, args, reason):
-        return False
+    def request_approval(self, request):
+        return ApprovalDecision(approved=False, approver="test:denier")
 
 
 def make_ctx(tool_name: str, args_json: str) -> ToolContext:

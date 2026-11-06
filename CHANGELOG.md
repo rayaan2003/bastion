@@ -7,6 +7,13 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
+- **Who approved or denied.** `approved`/`denied` audit events carry
+  `approver` (`slack:<user id>`, `console:<os user>`, `dashboard:ui` /
+  `dashboard:api`; empty on a timeout). Slack and dashboard approval
+  requests include the call's `call_id` and `session_id`; the dashboard
+  stores them, shows the approver on the audit log and links each pending
+  approval to its audit trail.
+
 - **Audit args are redacted by default.** PII/secrets found by the scanner
   are masked in logged args (`"[REDACTED:ssn_us]"`), including nested
   values and numbers. Policy and the tool still see raw args.
@@ -36,6 +43,13 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Changed
 
+- **`ApprovalHandler` interface (breaking):**
+  `request_approval(tool_name, args, reason) -> bool` is now
+  `request_approval(request: ApprovalRequest) -> ApprovalDecision`. To
+  migrate a custom handler, read `request.tool_name` / `.args` / `.reason`
+  and return `ApprovalDecision(approved=..., approver=...)`.
+- Slack approval: a deny reaction now wins when both reactions are
+  present (previously approve did).
 - **Module moves (breaking imports):**
   `bastion.integrations.slack` → `bastion.approval.slack`,
   `bastion.integrations.dashboard` → `bastion.dashboard`.

@@ -8,7 +8,8 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json();
 
-  const { id, timestamp, session_id, tool_name, args, action, reason, call_id } = body;
+  const { id, timestamp, session_id, tool_name, args, action, reason, call_id, approver } =
+    body;
   if (!id || !session_id || !tool_name || !action) {
     return NextResponse.json(
       { error: "id, session_id, tool_name, and action are required" },
@@ -25,6 +26,7 @@ export async function POST(request: NextRequest) {
     action,
     reason: reason ?? "",
     call_id: call_id || null,
+    approver: approver || null,
   });
 
   return NextResponse.json({ ok: true }, { status: 201 });

@@ -18,6 +18,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_events_timestamp ON audit_events ("timestam
 -- on startup like the rest of this file.
 ALTER TABLE audit_events ADD COLUMN IF NOT EXISTS call_id TEXT;
 CREATE INDEX IF NOT EXISTS idx_audit_events_call ON audit_events (call_id);
+ALTER TABLE audit_events ADD COLUMN IF NOT EXISTS approver TEXT;
 
 CREATE TABLE IF NOT EXISTS approval_requests (
   id TEXT PRIMARY KEY,
@@ -30,6 +31,13 @@ CREATE TABLE IF NOT EXISTS approval_requests (
 );
 
 CREATE INDEX IF NOT EXISTS idx_approval_requests_status ON approval_requests (status);
+
+-- call_id/session_id link a request to its audit events. decided_by is where
+-- the decision was made ('ui' or 'api') - not a person, since the dashboard
+-- has a single shared login.
+ALTER TABLE approval_requests ADD COLUMN IF NOT EXISTS call_id TEXT;
+ALTER TABLE approval_requests ADD COLUMN IF NOT EXISTS session_id TEXT;
+ALTER TABLE approval_requests ADD COLUMN IF NOT EXISTS decided_by TEXT;
 
 CREATE TABLE IF NOT EXISTS policy_versions (
   id TEXT PRIMARY KEY,

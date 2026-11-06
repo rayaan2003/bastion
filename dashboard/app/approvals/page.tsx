@@ -8,14 +8,14 @@ export const dynamic = "force-dynamic";
 async function approve(formData: FormData) {
   "use server";
   const id = formData.get("id") as string;
-  await decideApproval(id, "approved");
+  await decideApproval(id, "approved", "ui");
   revalidatePath("/approvals");
 }
 
 async function deny(formData: FormData) {
   "use server";
   const id = formData.get("id") as string;
-  await decideApproval(id, "denied");
+  await decideApproval(id, "denied", "ui");
   revalidatePath("/approvals");
 }
 
@@ -41,6 +41,17 @@ export default async function ApprovalsPage() {
                 <p className="text-neutral-500 text-xs font-mono">{JSON.stringify(req.args)}</p>
                 <p className="text-neutral-600 text-xs mt-1">
                   {new Date(req.created_at).toLocaleString()}
+                  {req.call_id ? (
+                    <>
+                      {" · "}
+                      <a
+                        href={`/audit?call_id=${encodeURIComponent(req.call_id)}`}
+                        className="underline hover:text-neutral-400"
+                      >
+                        audit trail
+                      </a>
+                    </>
+                  ) : null}
                 </p>
               </div>
               <div className="flex gap-2 shrink-0">

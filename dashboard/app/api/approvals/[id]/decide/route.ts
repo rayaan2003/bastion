@@ -20,7 +20,7 @@ export async function POST(
     );
   }
 
-  const updated = await decideApproval(id, decision);
+  const updated = await decideApproval(id, decision, "api");
   if (!updated) {
     return NextResponse.json(
       { error: "approval not found, or already decided" },

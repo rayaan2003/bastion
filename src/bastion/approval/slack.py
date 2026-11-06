@@ -15,7 +15,7 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from bastion.approval import ApprovalHandler
+from bastion.approval import ApprovalDecision, ApprovalHandler, ApprovalRequest
 
 
 class SlackApprovalHandler(ApprovalHandler):
@@ -52,11 +52,12 @@ class SlackApprovalHandler(ApprovalHandler):
         self.poll_interval = poll_interval
         self.timeout = timeout
 
-    def request_approval(self, tool_name: str, args: dict[str, Any], reason: str) -> bool:
+    def request_approval(self, request: ApprovalRequest) -> ApprovalDecision:
         text = (
-            f":rotating_light: *Approval required* for tool `{tool_name}`\n"
-            f"*Args:* `{args}`\n"
-            f"*Reason:* {reason}\n\n"
+            f":rotating_light: *Approval required* for tool `{request.tool_name}`\n"
+            f"*Args:* `{request.args}`\n"
+            f"*Reason:* {request.reason}\n"
+            f"*Call:* `{request.call_id}`\n\n"
             f"React :{self.approve_emoji}: to approve or :{self.deny_emoji}: to deny "
             f"(times out in {int(self.timeout)}s)."
         )
@@ -65,16 +66,19 @@ class SlackApprovalHandler(ApprovalHandler):
 
         deadline = time.monotonic() + self.timeout
         while time.monotonic() < deadline:
-            reactions = self._reaction_names(message_ts)
-            if self.approve_emoji in reactions:
-                return True
-            if self.deny_emoji in reactions:
-                return False
+            reactions = self._reactions(message_ts)
+            # Deny wins if both are present: one reviewer objecting is enough.
+            if deniers := reactions.get(self.deny_emoji):
+                return ApprovalDecision(approved=False, approver=f"slack:{deniers[0]}")
+            if approvers := reactions.get(self.approve_emoji):
+                return ApprovalDecision(approved=True, approver=f"slack:{approvers[0]}")
             time.sleep(self.poll_interval)
 
-        return False  # fail closed: no reviewer response within timeout = denied
+        # Fail closed: no reviewer response within timeout = denied.
+        return ApprovalDecision(approved=False)
 
-    def _reaction_names(self, message_ts: str) -> set[str]:
+    def _reactions(self, message_ts: str) -> dict[str, list[str]]:
+        """Reaction name -> ids of the users who reacted with it."""
         result = self.client.reactions_get(channel=self.channel, timestamp=message_ts)
         message: dict[str, Any] = result.get("message", {})
-        return {r["name"] for r in message.get("reactions", [])}
+        return {r["name"]: list(r.get("users", [])) for r in message.get("reactions", [])}
