@@ -20,11 +20,8 @@ SDK's `@function_tool` turns an exception into an error-string result
 (`failure_error_function`), so such errors show up as `completed`; pass
 `failure_error_function=None` to have them raise and be audited as `failed`.
 
-Note: `ApprovalHandler.request_approval` is synchronous/blocking (same
-interface used by the console, Slack and dashboard handlers). The Agents
-SDK's tool invocation is async, so an approval wait here blocks the event
-loop for its duration — fine for a single agent run, worth knowing if
-you're running many agents concurrently on one loop.
+An approval wait runs on a worker thread, so other tool calls and agents
+on the same event loop keep running while a human decides.
 
 Requires the `openai-agents` extra: pip install bastionguard[openai-agents]
 """
@@ -39,7 +36,7 @@ from typing import TYPE_CHECKING, Any
 
 from bastion.approval import ApprovalHandler, ConsoleApprovalHandler
 from bastion.audit import AuditLogger
-from bastion.guard import describe_error, evaluate_and_record, record_outcome
+from bastion.guard import describe_error, evaluate_and_record_async, record_outcome
 from bastion.policy import PolicyEngine
 
 if TYPE_CHECKING:
@@ -100,7 +97,7 @@ def _guard_function_tool(
             call_args = {"_raw": input_str}
 
         call_id = getattr(ctx, "tool_call_id", None) or str(uuid.uuid4())
-        allowed, reason = evaluate_and_record(
+        allowed, reason = await evaluate_and_record_async(
             tool_name,
             call_args,
             policy=policy,

@@ -116,8 +116,7 @@ under `bypassPermissions`, never reached bastion. The hook runs for every
 call. An allowed call returns no decision rather than `"allow"`, since a
 hook allow also skips the SDK's permission checks; the matcher uses
 `on_failure="block"` so a hook error blocks the call; policy and approval
-run via `asyncio.to_thread` so an approval wait doesn't stall the SDK's
-event loop. Outcome hooks don't set `on_failure`, so an audit error there can't block
+run through `evaluate_and_record_async()` (below). Outcome hooks don't set `on_failure`, so an audit error there can't block
 anything. `guarded_can_use_tool()` remains for compatibility.
 
 **LangChain tools are guarded on both `.func` and `.coroutine`.** `ainvoke`
@@ -134,10 +133,17 @@ made (`ui`/`api`) rather than a person, because it has one shared login;
 named reviewers need the multi-user dashboard. Slack takes the first user
 to react, and a deny reaction wins over an approve.
 
-**`ApprovalHandler` is synchronous.** One interface for console, Slack and
-dashboard. The Claude Agent SDK hook runs it on a worker thread; the OpenAI
-Agents integration still calls it inline, so an approval wait blocks that
-event loop. On the roadmap.
+**`ApprovalHandler` is synchronous; async callers wait for it on a
+thread.** One interface for console, Slack and dashboard, rather than a
+sync and an async variant of each. Every async path (OpenAI Agents, both
+Claude Agent SDK entry points, async tools under `guard()`) goes through
+`evaluate_and_record_async()`, which evaluates policy on the event loop and
+moves only the approval wait to a thread, so allowed calls never touch a
+thread. That thread comes from bastion's own pool (32 threads), not the
+loop's default executor: the default pool is small and shared, the OpenAI
+Agents SDK runs sync tools on it, and a pending approval can hold a thread
+for minutes. More than 32 simultaneous pending approvals queue behind each
+other, not behind tool calls.
 
 **Scanning is regex, not ML.** No model download or spaCy dependency, fast
 enough to run on every call. It catches the common, costly leaks and has a
