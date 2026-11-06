@@ -8,6 +8,7 @@ import os
 import select
 import sys
 import threading
+import time
 from pathlib import Path
 from typing import Any
 
@@ -193,10 +194,19 @@ def test_call_cancelled_during_approval_never_runs(make_proxy, held_approval):
     proxy.send(
         {"jsonrpc": "2.0", "method": "notifications/cancelled", "params": {"requestId": 7}}
     )
+    # The proxy handles client messages in order, so once this answers, it
+    # has seen the cancellation.
+    assert [m["method"] for m in proxy.server_received()] == ["notifications/cancelled"]
     held_approval.release.set()
 
     assert proxy.nothing_to_recv()
-    assert [m["method"] for m in proxy.server_received()] == ["notifications/cancelled"]
+    assert [m["method"] for m in proxy.server_received()] == [
+        "notifications/cancelled",
+        "test/received",
+    ]
+    deadline = time.monotonic() + 5
+    while len(proxy.events) < 2 and time.monotonic() < deadline:
+        time.sleep(0.01)
     assert _actions(proxy) == [("delete_note", "approved"), ("delete_note", "failed")]
     assert proxy.events[1].reason == "cancelled by the client before it ran"
 
