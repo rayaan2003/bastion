@@ -5,12 +5,56 @@
 [![Python](https://img.shields.io/pypi/pyversions/bastionguard.svg)](https://pypi.org/project/bastionguard/)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
-Policy enforcement for AI agent tool calls. Before a tool runs, bastion
-decides whether the agent may call it, needs a human to approve it, or is
-blocked — and logs the decision.
+**Your agent can call `delete_customer`. bastion decides whether it does.**
 
-It runs in your agent's process, works with LangGraph, the OpenAI Agents
-SDK and the Claude Agent SDK, and has no dependencies beyond PyYAML.
+bastion sits between an AI agent and its tools. Every tool call is checked
+against your policy before it runs: allowed, blocked, or held until a human
+approves it in Slack. Every decision lands in an audit log, with PII and
+secrets masked.
+
+```mermaid
+flowchart LR
+    A[Agent] -->|tool call| B{bastion<br/>policy}
+    B -->|allow| T[Tool runs]
+    B -->|approve| H[Human in Slack<br/>or dashboard]
+    H -->|✅| T
+    H -->|❌| X
+    B -->|block| X[Agent gets the reason]
+    B -.->|every decision| L[(Audit log)]
+```
+
+- **Policies as YAML.** Glob on tool names, conditions on arguments
+  (amount over $500, recipient outside your domain, a credit card in the
+  args), first match wins. Reviewable in a PR.
+- **Human approval.** A ✅ or ❌ reaction in Slack, a queue on the
+  dashboard, or your own channel. Limit who can approve. Nobody answers,
+  nothing runs.
+- **Shadow mode.** Run a new policy against real traffic and see what it
+  *would* block before it blocks anything.
+- **An audit trail.** Every decision and outcome, linked per call, with who
+  approved it. PII and secrets are masked before they're written.
+- **A dashboard.** Self-hosted audit viewer, approval queue and policy
+  editor.
+
+## Two ways in
+
+| You have | Use | Code changes |
+|---|---|---|
+| A Python agent (LangGraph, OpenAI Agents SDK, Claude Agent SDK, plain functions) | the [SDK](#in-code-the-python-sdk) | one wrapper |
+| An MCP client (Claude Desktop, Cursor, Claude Code) and its MCP servers | the [MCP proxy](#no-code-the-mcp-proxy) | none, it's config |
+
+Both use the same YAML policies, approvals and audit log.
+
+```bash
+pip install bastionguard
+```
+
+Python 3.10+. The only dependency is PyYAML; framework support is an extra
+(`pip install "bastionguard[langgraph]"`, or `openai-agents`,
+`claude-agent-sdk`, `slack`). The package is `bastionguard`, the import is
+`bastion`.
+
+## In code: the Python SDK
 
 ```python
 from bastion import Action, PolicyEngine, Rule, guard
@@ -38,20 +82,75 @@ BlockedByPolicy: Tool call 'refund' blocked by policy: approval denied (refunds 
 BlockedByPolicy: Tool call 'delete_customer' blocked by policy: irreversible
 ```
 
-## Install
+Framework adapters are under [Frameworks](#frameworks).
 
-```bash
-pip install bastionguard
+## No code: the MCP proxy
+
+`bastion mcp-proxy` wraps any stdio MCP server. Point your MCP client at
+bastion instead of the server, and put the real server command after `--`:
+
+```json
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "bastion",
+      "args": [
+        "mcp-proxy", "--policy", "/Users/you/.bastion/policy.yaml",
+        "--", "npx", "-y", "@modelcontextprotocol/server-filesystem", "/Users/you/notes"
+      ]
+    }
+  }
+}
 ```
 
-The package is `bastionguard` on PyPI; the import is `bastion`. Framework
-and Slack support are extras:
+That's `claude_desktop_config.json` for Claude Desktop, and the same shape
+in `~/.cursor/mcp.json` for Cursor. Desktop apps often don't see your
+shell's `PATH`, so use the full path from `which bastion`, or skip the
+install with `"command": "uvx"` and `"args": ["--from", "bastionguard",
+"bastion", "mcp-proxy", ...]`. For Claude Code:
 
 ```bash
-pip install "bastionguard[langgraph]"          # or openai-agents, claude-agent-sdk, slack
+claude mcp add filesystem -- bastion mcp-proxy --policy ~/.bastion/policy.yaml \
+  -- npx -y @modelcontextprotocol/server-filesystem ~/notes
 ```
 
-Python 3.10+.
+with a policy like:
+
+```yaml
+# ~/.bastion/policy.yaml
+rules:
+  - tool: move_file
+    action: block
+    reason: files stay where they are
+  - tool: write_file
+    action: approve          # with --approval slack, someone ✅s it first
+    reason: writes need a human
+```
+
+The client sees the server's tools as usual. When the model calls one the
+policy blocks, the server never gets the call, and the model gets the
+reason as the tool's result:
+
+```text
+Tool call blocked by policy: files stay where they are
+```
+
+Not sure what a server's tools are called? Start with `shadow: true` in
+the policy. Every call is logged to `~/.bastion/audit.jsonl` with its
+tool name and what the policy would have done, and nothing is blocked.
+
+| Flag | |
+|---|---|
+| `--policy FILE` | YAML policy |
+| `--approval slack` | ask in Slack: `--slack-channel`, `--slack-approver USER_ID` (repeatable), `$SLACK_BOT_TOKEN` |
+| `--approval dashboard` | queue approvals on the [dashboard](#dashboard) |
+| `--dashboard-url URL` | send audit events there, and load the policy from it when `--policy` is omitted (`$BASTION_DASHBOARD_API_KEY`) |
+| `--audit-log FILE` | default `~/.bastion/audit.jsonl` |
+
+Without `--approval`, `approve` rules deny: the terminal can't prompt,
+because stdin is the MCP connection. Everything besides `tools/call`
+(resources, prompts, sampling) passes through untouched, on both pre-2026
+sessions and the stateless 2026-07-28 protocol.
 
 ## Policies
 
@@ -298,6 +397,8 @@ Known limitations:
 
 - The dashboard has one shared login and one API key; there are no users
   or projects yet.
+- The MCP proxy speaks stdio, so it covers local MCP servers; remote
+  (Streamable HTTP) servers aren't covered yet.
 
 ## Contributing
 
