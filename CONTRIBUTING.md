@@ -49,6 +49,11 @@ npm run build
 
 See [dashboard/README.md](dashboard/README.md) for env var setup.
 
+CI's `dashboard-e2e` job also runs `tests/e2e/` — the Python SDK against a
+built dashboard and a Postgres container, starting from a database in the
+v0.1.0 schema so the startup migrations are tested. Those tests skip locally
+unless `BASTION_E2E_URL` points at a running dashboard.
+
 ## Questions
 
 Open an [issue](https://github.com/rayaan2003/bastion/issues) — happy
