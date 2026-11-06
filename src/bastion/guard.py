@@ -8,13 +8,20 @@ and call back into `guard()`.
 
 from __future__ import annotations
 
+import asyncio
 import functools
 import inspect
 import uuid
 from collections.abc import Callable, Iterable
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
-from bastion.approval import ApprovalHandler, ApprovalRequest, ConsoleApprovalHandler
+from bastion.approval import (
+    ApprovalDecision,
+    ApprovalHandler,
+    ApprovalRequest,
+    ConsoleApprovalHandler,
+)
 from bastion.audit import AuditLogger
 from bastion.policy import Action, PolicyEngine
 from bastion.scanning import redact
@@ -43,12 +50,54 @@ def evaluate_and_record(
     same id to `record_outcome()` once an allowed tool has run.
 
     Returns (allowed, reason). Shared by `guard()` and the framework
-    integrations (LangGraph wraps tools directly so doesn't need this;
-    OpenAI Agents SDK and Claude Agent SDK do) so the actual policy/audit/
-    approval logic lives in exactly one place. What happens when not
-    allowed — raise, return an error string, etc. — differs per framework,
-    so that decision is left to the caller.
+    integrations so the actual policy/audit/approval logic lives in exactly
+    one place. What happens when not allowed — raise, return an error
+    string, etc. — differs per framework, so that decision is left to the
+    caller. Async callers use `evaluate_and_record_async()`.
     """
+    request, settle = _evaluate(tool_name, args, policy=policy, audit=audit, call_id=call_id)
+    return settle(approval_handler.request_approval(request) if request else None)
+
+
+async def evaluate_and_record_async(
+    tool_name: str,
+    args: dict[str, Any],
+    *,
+    policy: PolicyEngine,
+    audit: AuditLogger,
+    approval_handler: ApprovalHandler,
+    call_id: str | None = None,
+) -> tuple[bool, str]:
+    """`evaluate_and_record()` for code running on an event loop.
+
+    Approval handlers block until a human answers, so the wait runs on a
+    worker thread and other tool calls on the loop keep going.
+    """
+    request, settle = _evaluate(tool_name, args, policy=policy, audit=audit, call_id=call_id)
+    if request is None:
+        return settle(None)
+    loop = asyncio.get_running_loop()
+    answer = await loop.run_in_executor(_approval_waits, approval_handler.request_approval, request)
+    return settle(answer)
+
+
+# Not the loop's default executor: that pool is small and shared (the OpenAI
+# Agents SDK runs sync tools on it), and a pending approval can hold a thread
+# for minutes.
+_approval_waits = ThreadPoolExecutor(max_workers=32, thread_name_prefix="bastion-approval")
+
+
+def _evaluate(
+    tool_name: str,
+    args: dict[str, Any],
+    *,
+    policy: PolicyEngine,
+    audit: AuditLogger,
+    call_id: str | None,
+) -> tuple[ApprovalRequest | None, Callable[[ApprovalDecision | None], tuple[bool, str]]]:
+    """Evaluate policy and return the approval request it needs (None if it
+    needs none) and a function that records and returns the final outcome
+    once the caller has the approval decision."""
     call_id = call_id or str(uuid.uuid4())
     decision = policy.evaluate(tool_name, args)
 
@@ -58,28 +107,30 @@ def evaluate_and_record(
     if decision.shadow is not None:
         record(f"would_{decision.shadow.action.value}", decision.shadow.reason)
 
-    if decision.action == Action.BLOCK:
-        record("blocked", decision.reason)
-        return False, decision.reason
-
+    request = None
     if decision.action == Action.APPROVE:
-        answer = approval_handler.request_approval(
-            ApprovalRequest(
-                tool_name=tool_name,
-                args=args,
-                reason=decision.reason,
-                call_id=call_id,
-                session_id=audit.session_id,
-            )
+        request = ApprovalRequest(
+            tool_name=tool_name,
+            args=args,
+            reason=decision.reason,
+            call_id=call_id,
+            session_id=audit.session_id,
         )
-        if not answer.approved:
-            record("denied", decision.reason, answer.approver)
-            return False, f"approval denied ({decision.reason})"
-        record("approved", decision.reason, answer.approver)
+
+    def settle(answer: ApprovalDecision | None) -> tuple[bool, str]:
+        if decision.action == Action.BLOCK:
+            record("blocked", decision.reason)
+            return False, decision.reason
+        if decision.action == Action.APPROVE:
+            if answer is None or not answer.approved:
+                record("denied", decision.reason, answer.approver if answer else "")
+                return False, f"approval denied ({decision.reason})"
+            record("approved", decision.reason, answer.approver)
+            return True, decision.reason
+        record("allowed", decision.reason)
         return True, decision.reason
 
-    record("allowed", decision.reason)
-    return True, decision.reason
+    return request, settle
 
 
 _MAX_ERROR_LENGTH = 1000
@@ -125,10 +176,23 @@ def guard(
 
     def enforce(args: tuple[Any, ...], kwargs: dict[str, Any]) -> str:
         call_id = str(uuid.uuid4())
-        call_args = _build_args_dict(fn, args, kwargs)
         allowed, reason = evaluate_and_record(
             name,
-            call_args,
+            _build_args_dict(fn, args, kwargs),
+            policy=policy,
+            audit=audit,
+            approval_handler=approval_handler,
+            call_id=call_id,
+        )
+        if not allowed:
+            raise BlockedByPolicy(name, reason)
+        return call_id
+
+    async def enforce_async(args: tuple[Any, ...], kwargs: dict[str, Any]) -> str:
+        call_id = str(uuid.uuid4())
+        allowed, reason = await evaluate_and_record_async(
+            name,
+            _build_args_dict(fn, args, kwargs),
             policy=policy,
             audit=audit,
             approval_handler=approval_handler,
@@ -142,7 +206,7 @@ def guard(
 
         @functools.wraps(fn)
         async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
-            call_id = enforce(args, kwargs)
+            call_id = await enforce_async(args, kwargs)
             try:
                 result = await fn(*args, **kwargs)
             except Exception as e:

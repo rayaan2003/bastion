@@ -5,7 +5,6 @@ calls it internally: an async (tool_name, input_data, context) callback.
 
 import asyncio
 import json
-import threading
 
 import pytest
 
@@ -133,19 +132,22 @@ def run_hook(matcher: HookMatcher, tool_name: str, tool_input: dict) -> dict:
     """Invoke the hook the way the SDK does when the CLI sends a hook_callback:
     `await callback(input, tool_use_id, {"signal": None})`, then the result
     goes to the CLI as JSON."""
-    hook_input = {
+    [callback] = matcher.hooks
+    output = asyncio.run(callback(_pre_input(tool_name, tool_input), "toolu_1", {"signal": None}))
+    json.dumps(output)
+    return output
+
+
+def _pre_input(tool_name: str, tool_input: dict, tool_use_id: str = "toolu_1") -> dict:
+    return {
         "hook_event_name": "PreToolUse",
         "session_id": "sess-1",
         "transcript_path": "/tmp/t.jsonl",
         "cwd": "/tmp",
         "tool_name": tool_name,
         "tool_input": tool_input,
-        "tool_use_id": "toolu_1",
+        "tool_use_id": tool_use_id,
     }
-    [callback] = matcher.hooks
-    output = asyncio.run(callback(hook_input, "toolu_1", {"signal": None}))
-    json.dumps(output)
-    return output
 
 
 def _hooks(policy: PolicyEngine, approval_handler=None, events: list | None = None) -> dict:
@@ -212,17 +214,35 @@ def test_hook_approval_approved_and_denied():
     assert "approval denied" in denied["hookSpecificOutput"]["permissionDecisionReason"]
 
 
-def test_hook_runs_approval_off_the_event_loop_thread():
-    seen: list[bool] = []
+def test_hook_lets_other_tools_run_while_an_approval_is_pending(held_approval):
+    policy = PolicyEngine().add_rule(Rule(tool_pattern="Write", action=Action.APPROVE))
+    events: list = []
+    [callback] = _hooks(policy, held_approval, events)["PreToolUse"][0].hooks
 
-    class RecordsThread(ApprovalHandler):
-        def request_approval(self, request):
-            seen.append(threading.current_thread() is threading.main_thread())
-            return ApprovalDecision(approved=True)
+    def call(tool_name: str, tool_use_id: str):
+        return lambda: callback(_pre_input(tool_name, {}, tool_use_id), tool_use_id, {})
 
-    policy = PolicyEngine().add_rule(Rule(tool_pattern="*", action=Action.APPROVE))
-    run_hook(_hook(policy, RecordsThread()), "Bash", {"command": "ls"})
-    assert seen == [False]
+    results = held_approval.run_alongside(call("Write", "toolu_w"), call("Read", "toolu_r"))
+
+    assert results == ({}, {})
+    assert [(e.call_id, e.action) for e in events] == [
+        ("toolu_r", "allowed"),
+        ("toolu_w", "approved"),
+    ]
+
+
+def test_can_use_tool_lets_other_tools_run_while_an_approval_is_pending(held_approval):
+    policy = PolicyEngine().add_rule(Rule(tool_pattern="Write", action=Action.APPROVE))
+    can_use_tool = guarded_can_use_tool(
+        policy=policy, audit=AuditLogger(sink=lambda e: None), approval_handler=held_approval
+    )
+
+    def call(tool_name: str):
+        return lambda: can_use_tool(tool_name, {}, ToolPermissionContext())
+
+    write, read = held_approval.run_alongside(call("Write"), call("Read"))
+    assert isinstance(write, PermissionResultAllow)
+    assert isinstance(read, PermissionResultAllow)
 
 
 def test_hook_ignores_non_pre_tool_use_events():

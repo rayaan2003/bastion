@@ -159,3 +159,38 @@ def test_approver_is_audited_and_request_carries_the_call_ids(decision, expected
         call_id=events[0].call_id,
         session_id="sess-7",
     )
+
+
+def test_async_calls_keep_running_while_an_approval_is_pending(held_approval):
+    async def refund() -> str:
+        return "refunded"
+
+    async def lookup() -> str:
+        return "found"
+
+    events: list[AuditEvent] = []
+    audit = AuditLogger(sink=events.append)
+    policy = PolicyEngine().add_rule(Rule("refund", Action.APPROVE, reason="money"))
+    guarded_refund = guard(refund, policy=policy, audit=audit, approval_handler=held_approval)
+    guarded_lookup = guard(lookup, policy=policy, audit=audit, approval_handler=held_approval)
+
+    results = held_approval.run_alongside(guarded_refund, guarded_lookup)
+
+    assert results == ("refunded", "found")
+    assert [(e.tool_name, e.action) for e in events] == [
+        ("lookup", "allowed"),
+        ("lookup", "completed"),
+        ("refund", "approved"),
+        ("refund", "completed"),
+    ]
+
+
+def test_async_approval_denied_raises():
+    async def refund() -> str:
+        return "refunded"
+
+    policy = PolicyEngine().add_rule(Rule("refund", Action.APPROVE, reason="money"))
+    fn, events = _guarded(refund, policy)
+    with pytest.raises(BlockedByPolicy, match="approval denied"):
+        asyncio.run(fn())
+    assert [(e.action, e.approver) for e in events] == [("denied", "auto-deny")]

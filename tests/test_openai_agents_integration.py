@@ -179,3 +179,26 @@ def test_tool_error_is_recorded_as_failed_when_the_sdk_lets_it_raise():
 
     assert [e.action for e in events] == ["allowed", "failed"]
     assert "down" in events[1].reason
+
+
+def test_other_tools_keep_running_while_an_approval_is_pending(held_approval):
+    policy = PolicyEngine().add_rule(Rule("delete_*", Action.APPROVE, reason="sign-off"))
+    audit, events = _recording_audit()
+    guarded_delete, guarded_search = guarded_tools(
+        [delete_user, search_docs], policy=policy, audit=audit, approval_handler=held_approval
+    )
+
+    def call(tool, args_json: str):
+        return lambda: tool.on_invoke_tool(make_ctx(tool.name, args_json), args_json)
+
+    results = held_approval.run_alongside(
+        call(guarded_delete, '{"user_id": "u1"}'), call(guarded_search, '{"query": "q"}')
+    )
+
+    assert results == ("deleted u1", "3 results for 'q'")
+    assert [(e.tool_name, e.action) for e in events] == [
+        ("search_docs", "allowed"),
+        ("search_docs", "completed"),
+        ("delete_user", "approved"),
+        ("delete_user", "completed"),
+    ]

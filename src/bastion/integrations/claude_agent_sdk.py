@@ -26,12 +26,11 @@ Requires the `claude-agent-sdk` extra: pip install bastionguard[claude-agent-sdk
 
 from __future__ import annotations
 
-import asyncio
 from typing import TYPE_CHECKING, Any
 
 from bastion.approval import ApprovalHandler, ConsoleApprovalHandler
 from bastion.audit import AuditLogger
-from bastion.guard import evaluate_and_record, record_outcome
+from bastion.guard import evaluate_and_record_async, record_outcome
 from bastion.policy import PolicyEngine
 
 if TYPE_CHECKING:
@@ -69,7 +68,7 @@ def guarded_can_use_tool(
     async def can_use_tool(
         tool_name: str, input_data: dict[str, Any], context: ToolPermissionContext
     ) -> PermissionResultAllow | PermissionResultDeny:
-        allowed, reason = evaluate_and_record(
+        allowed, reason = await evaluate_and_record_async(
             tool_name, input_data, policy=policy, audit=audit, approval_handler=approval_handler
         )
         if allowed:
@@ -118,10 +117,7 @@ def guarded_hooks(
         if input_data["hook_event_name"] != "PreToolUse":
             return {}
 
-        # Approval handlers block until a human answers; run them on a worker
-        # thread so the wait doesn't stall the SDK's event loop.
-        allowed, reason = await asyncio.to_thread(
-            evaluate_and_record,
+        allowed, reason = await evaluate_and_record_async(
             input_data["tool_name"],
             input_data["tool_input"],
             policy=policy,

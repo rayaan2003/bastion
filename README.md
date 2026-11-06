@@ -290,9 +290,6 @@ listed in [CHANGELOG.md](CHANGELOG.md). Next up is in
 
 Known limitations:
 
-- Approval handlers are synchronous. The Claude Agent SDK hook runs them
-  on a worker thread, but with the OpenAI Agents SDK a pending approval
-  blocks the event loop.
 - The dashboard has one shared login and one API key; there are no users
   or projects yet.
 

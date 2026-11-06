@@ -7,6 +7,15 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
+- **Approval waits no longer block the event loop.** The OpenAI Agents
+  integration, `guarded_can_use_tool()`, and async tools wrapped by
+  `guard()` / `guard_tools()` / `guarded_tool_node()` now wait for a human
+  on a worker thread, so other tool calls and agents on the same loop keep
+  running. Previously only the Claude Agent SDK hook did. Approval waits
+  use bastion's own thread pool rather than the loop's default one, which
+  the OpenAI Agents SDK needs for sync tools. New public helper:
+  `bastion.guard.evaluate_and_record_async()`.
+
 - **Who approved or denied.** `approved`/`denied` audit events carry
   `approver` (`slack:<user id>`, `console:<os user>`, `dashboard:ui` /
   `dashboard:api`; empty on a timeout). Slack and dashboard approval
