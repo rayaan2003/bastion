@@ -12,6 +12,7 @@ import threading
 import time
 import urllib.parse
 import uuid
+from email.message import Message
 from typing import Any
 
 import pytest
@@ -33,7 +34,7 @@ pytestmark = pytest.mark.skipif(not URL, reason="needs a running dashboard (BAST
 
 def _request(
     method: str, path: str, *, body: bytes | None = None, headers: dict[str, str] | None = None
-) -> tuple[int, dict[str, str], str]:
+) -> tuple[int, Message, str]:
     # http.client rather than urllib: no redirect following, and no cookie
     # jar dropping the dashboard's Secure session cookie over plain http.
     parsed = urllib.parse.urlparse(URL)
@@ -41,7 +42,8 @@ def _request(
     try:
         conn.request(method, path, body=body, headers=headers or {})
         response = conn.getresponse()
-        return response.status, dict(response.getheaders()), response.read().decode()
+        # response.headers looks names up case-insensitively; Next sends them lowercase.
+        return response.status, response.headers, response.read().decode()
     finally:
         conn.close()
 
@@ -89,7 +91,8 @@ def session_cookie() -> str:
 
 def _page(path: str, cookie: str) -> tuple[int, str, str]:
     status, headers, text = _request("GET", path, headers={"Cookie": cookie})
-    return status, text, headers.get("Location", "")
+    # React separates adjacent text nodes with empty comments in SSR output.
+    return status, text.replace("<!-- -->", ""), headers.get("Location", "")
 
 
 def test_api_rejects_a_wrong_key():
