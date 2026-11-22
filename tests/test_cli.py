@@ -99,3 +99,51 @@ def test_verify_audit_rejects_a_missing_file(tmp_path, capsys):
         cli.main(["verify-audit", str(tmp_path / "nope.jsonl")])
     assert exit_info.value.code == 2
     assert "nope.jsonl" in capsys.readouterr().err
+
+
+def test_verify_audit_against_the_dashboard(tmp_path, capsys, monkeypatch):
+    from bastion import dashboard
+
+    log = _chained_log(tmp_path / "audit.jsonl", 3)
+    lines = log.read_text().splitlines(keepends=True)
+    chain_id = json.loads(lines[0])["chain_id"]
+    log.write_text(lines[0])  # cut seqs 1-2 off the end
+    fetched: list[tuple[str, str, str]] = []
+
+    def fake_fetch(base_url: str, api_key: str, chain: str) -> dict[int, str]:
+        fetched.append((base_url, api_key, chain))
+        return {0: json.loads(lines[0])["hash"], 1: "h1", 2: "h2"}
+
+    monkeypatch.setattr(dashboard, "fetch_chain_hashes", fake_fetch)
+    monkeypatch.setenv("BASTION_DASHBOARD_API_KEY", "key")
+
+    assert cli.main(["verify-audit", str(log), "--dashboard-url", "http://dash"]) == 1
+    assert fetched == [("http://dash", "key", chain_id)]
+    assert capsys.readouterr().out == (
+        f"line 1 (chain {chain_id}): the log ends at seq 0 but the dashboard has events "
+        "up to seq 2: events were cut from the end\n"
+        "1 problem in 1 event across 1 chain\n"
+    )
+
+
+def test_verify_audit_warnings_dont_fail(tmp_path, capsys, monkeypatch):
+    from bastion import dashboard
+
+    log = _chained_log(tmp_path / "audit.jsonl", 1)
+    chain_id = json.loads(log.read_text())["chain_id"]
+    monkeypatch.setattr(dashboard, "fetch_chain_hashes", lambda *_: {})
+    monkeypatch.setenv("BASTION_DASHBOARD_API_KEY", "key")
+
+    assert cli.main(["verify-audit", str(log), "--dashboard-url", "http://dash"]) == 0
+    assert capsys.readouterr().out == (
+        f"warning: line 1 (chain {chain_id}): the dashboard has no events from this chain\n"
+        "no problems in 1 event across 1 chain\n"
+    )
+
+
+def test_verify_audit_against_the_dashboard_needs_the_api_key(tmp_path, capsys, monkeypatch):
+    log = _chained_log(tmp_path / "audit.jsonl", 1)
+    monkeypatch.delenv("BASTION_DASHBOARD_API_KEY", raising=False)
+    with pytest.raises(SystemExit):
+        cli.main(["verify-audit", str(log), "--dashboard-url", "http://dash"])
+    assert "BASTION_DASHBOARD_API_KEY" in capsys.readouterr().err

@@ -15,6 +15,7 @@ import logging
 import queue
 import threading
 import time
+import urllib.parse
 import urllib.request
 from typing import Any
 
@@ -148,6 +149,21 @@ def load_policy_from_dashboard(base_url: str, api_key: str) -> PolicyEngine:
             "dashboard has no policy configured yet - set one at the dashboard's /policy page"
         )
     return policy_from_yaml_string(yaml_text)
+
+
+def fetch_chain_hashes(base_url: str, api_key: str, chain_id: str) -> dict[int, str]:
+    """seq -> hash for every event the dashboard has stored in `chain_id`,
+    for `verify_audit_log(against=...)`."""
+    url = f"{base_url.rstrip('/')}/api/chains/{urllib.parse.quote(chain_id, safe='')}"
+    hashes: dict[int, str] = {}
+    after_seq = -1
+    while True:
+        page = _get_json(f"{url}?after_seq={after_seq}", api_key)
+        for link in page["links"]:
+            hashes[link["seq"]] = link["hash"]
+        if not page["more"] or not page["links"]:
+            return hashes
+        after_seq = page["links"][-1]["seq"]
 
 
 class DashboardApprovalHandler(ApprovalHandler):

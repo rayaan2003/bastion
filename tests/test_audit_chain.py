@@ -165,3 +165,80 @@ def test_lines_that_arent_events_are_reported(tmp_path):
         (2, "not a JSON event"),
         (3, "not a JSON event"),
     ]
+
+
+def _copy(path: Path) -> dict[str, dict[int, str]]:
+    """What the dashboard would hold had it received every event in `path`."""
+    chains: dict[str, dict[int, str]] = {}
+    for line in _lines(path):
+        event = json.loads(line)
+        chains.setdefault(event["chain_id"], {})[event["seq"]] = event["hash"]
+    return chains
+
+
+def _against(copy: dict[str, dict[int, str]]):
+    return lambda chain_id: copy.get(chain_id, {})
+
+
+def test_log_matching_the_dashboard_verifies(tmp_path):
+    log = tmp_path / "audit.jsonl"
+    _write(log, 3)
+    report = verify_audit_log(log, _against(_copy(log)))
+    assert (report.breaks, report.warnings) == ([], [])
+
+
+def test_rewritten_chain_passes_alone_but_not_against_the_dashboard(tmp_path):
+    log = tmp_path / "audit.jsonl"
+    _write(log, 3)
+    dashboard = _copy(log)
+    # Forge seq 1 and relink seq 2 after it, so the file is self-consistent.
+    events = [json.loads(line) for line in _lines(log)]
+    events[1]["action"] = "blocked"
+    events[1]["hash"] = event_hash(events[1])
+    events[2]["prev_hash"] = events[1]["hash"]
+    events[2]["hash"] = event_hash(events[2])
+    _rewrite(log, [json.dumps(e) for e in events])
+
+    assert verify_audit_log(log).breaks == []
+    assert _problems(verify_audit_log(log, _against(dashboard))) == [
+        (2, "seq 1 differs from the dashboard's copy: one of them was changed"),
+        (3, "seq 2 differs from the dashboard's copy: one of them was changed"),
+    ]
+
+
+def test_cut_off_end_passes_alone_but_not_against_the_dashboard(tmp_path):
+    log = tmp_path / "audit.jsonl"
+    _write(log, 5)
+    dashboard = _copy(log)
+    _rewrite(log, _lines(log)[:3])
+
+    assert verify_audit_log(log).breaks == []
+    assert _problems(verify_audit_log(log, _against(dashboard))) == [
+        (3, "the log ends at seq 2 but the dashboard has events up to seq 4: "
+            "events were cut from the end")
+    ]
+
+
+def test_events_the_dashboard_never_got_are_a_warning(tmp_path):
+    log = tmp_path / "audit.jsonl"
+    audit = _write(log, 5)
+    dashboard = _copy(log)
+    for seq in (2, 3):
+        del dashboard[audit.chain_id][seq]
+
+    report = verify_audit_log(log, _against(dashboard))
+    assert report.breaks == []
+    assert [(w.line, w.problem) for w in report.warnings] == [
+        (3, "2 events never reached the dashboard, starting at seq 2")
+    ]
+
+
+def test_chain_the_dashboard_never_saw_is_a_warning(tmp_path):
+    log = tmp_path / "audit.jsonl"
+    _write(log, 2)
+
+    report = verify_audit_log(log, _against({}))
+    assert report.breaks == []
+    assert [(w.line, w.problem) for w in report.warnings] == [
+        (1, "the dashboard has no events from this chain")
+    ]

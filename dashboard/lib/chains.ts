@@ -65,3 +65,26 @@ function describe(seq: number, expected: number): string {
   if (seq === 0) return "seq 0 has a prev_hash, but it should start its chain";
   return `seq ${seq} doesn't link to seq ${seq - 1}: one of them was replaced`;
 }
+
+const LINKS_PAGE_SIZE = 10_000;
+
+export interface ChainLinksPage {
+  links: { seq: number; hash: string }[];
+  // More links follow; ask again with after_seq set to the last seq here.
+  more: boolean;
+}
+
+export async function listChainLinks(chainId: string, afterSeq: number): Promise<ChainLinksPage> {
+  const db = await getDb();
+  const result = await db.query<{ seq: number; hash: string }>(
+    `SELECT seq, hash FROM audit_events
+     WHERE chain_id = $1 AND seq > $2
+     ORDER BY seq
+     LIMIT $3`,
+    [chainId, afterSeq, LINKS_PAGE_SIZE + 1]
+  );
+  return {
+    links: result.rows.slice(0, LINKS_PAGE_SIZE),
+    more: result.rows.length > LINKS_PAGE_SIZE,
+  };
+}

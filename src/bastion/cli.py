@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import functools
 import os
 from collections.abc import Sequence
 from pathlib import Path
 
 from bastion.approval import ApprovalHandler, AutoDenyHandler
 from bastion.audit import AuditLogger
-from bastion.audit_chain import verify_audit_log
+from bastion.audit_chain import ChainFinding, verify_audit_log
 from bastion.config import PolicyConfigError, load_policy_from_yaml
 from bastion.policy import PolicyEngine
 
@@ -71,7 +72,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="check a JSONL audit log's hash chains for edited or missing events",
         description=(
             "Exit 1 if any event was edited, removed or reordered. Events cut "
-            "from the end of a chain can't be detected from the file alone."
+            "from the end of a chain, or rewritten with their hashes recomputed, "
+            "are only caught with --dashboard-url."
         ),
     )
     verify.add_argument(
@@ -81,10 +83,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         default=DEFAULT_AUDIT_LOG,
         help="audit log (default: ~/.bastion/audit.jsonl)",
     )
+    verify.add_argument(
+        "--dashboard-url",
+        help=(
+            "also compare with the dashboard's copy of each chain, which catches "
+            "rewritten events and a cut-off end. API key: $BASTION_DASHBOARD_API_KEY"
+        ),
+    )
 
     args = parser.parse_args(argv)
     if args.command == "verify-audit":
-        return _verify_audit(parser, args.log)
+        return _verify_audit(parser, args.log, args.dashboard_url)
 
     server = args.server[1:] if args.server[:1] == ["--"] else args.server
     if not server:
@@ -102,14 +111,21 @@ def main(argv: Sequence[str] | None = None) -> int:
     return asyncio.run(run_proxy(server, policy=policy, audit=audit, approval_handler=handler))
 
 
-def _verify_audit(parser: argparse.ArgumentParser, log: Path) -> int:
+def _verify_audit(parser: argparse.ArgumentParser, log: Path, dashboard_url: str | None) -> int:
+    against = None
     try:
-        report = verify_audit_log(log)
-    except OSError as e:
+        if dashboard_url:
+            from bastion.dashboard import fetch_chain_hashes
+
+            api_key = _env("BASTION_DASHBOARD_API_KEY")
+            against = functools.partial(fetch_chain_hashes, dashboard_url, api_key)
+        report = verify_audit_log(log, against)
+    except (OSError, ValueError) as e:
         parser.error(str(e))
-    for b in report.breaks:
-        chain = f" (chain {b.chain_id})" if b.chain_id else ""
-        print(f"line {b.line}{chain}: {b.problem}")
+    for finding in report.breaks:
+        print(_finding(finding))
+    for finding in report.warnings:
+        print(f"warning: {_finding(finding)}")
     problems = _count(len(report.breaks), "problem").replace("0 problems", "no problems")
     print(
         f"{problems} in {_count(report.events, 'event')} "
@@ -121,6 +137,11 @@ def _verify_audit(parser: argparse.ArgumentParser, log: Path) -> int:
             "(written before bastion chained events)"
         )
     return 1 if report.breaks else 0
+
+
+def _finding(finding: ChainFinding) -> str:
+    chain = f" (chain {finding.chain_id})" if finding.chain_id else ""
+    return f"line {finding.line}{chain}: {finding.problem}"
 
 
 def _count(n: int, noun: str) -> str:

@@ -4,6 +4,7 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.parse
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
@@ -14,6 +15,7 @@ from bastion.audit import AuditEvent, AuditLogger
 from bastion.dashboard import (
     DashboardApprovalHandler,
     dashboard_audit_sink,
+    fetch_chain_hashes,
     load_policy_from_dashboard,
 )
 
@@ -32,6 +34,10 @@ class _FakeDashboardServer:
         self.get_counts: dict[str, int] = {}
         self.approve_after = approve_after
         self.policy_yaml = policy_yaml
+        # chain id -> [{"seq", "hash"}], served in pages of chain_page_size.
+        self.chains: dict[str, list[dict]] = {}
+        self.chain_page_size = 2
+        self.chain_requests: list[str] = []
 
         handler = self._make_handler()
         self.httpd = HTTPServer(("127.0.0.1", 0), handler)
@@ -109,6 +115,18 @@ class _FakeDashboardServer:
 
                 if self.path == "/api/policy":
                     self._send_json(200, {"yaml_text": server.policy_yaml})
+                    return
+
+                if self.path.startswith("/api/chains/"):
+                    server.chain_requests.append(self.path)
+                    url = urllib.parse.urlparse(self.path)
+                    chain_id = urllib.parse.unquote(url.path[len("/api/chains/"):])
+                    after = int(urllib.parse.parse_qs(url.query)["after_seq"][0])
+                    links = [x for x in server.chains.get(chain_id, []) if x["seq"] > after]
+                    page = links[: server.chain_page_size]
+                    self._send_json(
+                        200, {"links": page, "more": len(links) > server.chain_page_size}
+                    )
                     return
 
                 self._send_json(404, {"error": "not found"})
@@ -279,3 +297,21 @@ def test_load_policy_from_dashboard_raises_when_unset():
             load_policy_from_dashboard(server.base_url, _API_KEY)
     finally:
         server.shutdown()
+
+
+def test_fetch_chain_hashes_follows_every_page(fake_server):
+    chain = "chain/1"  # quoted into the path
+    fake_server.chains[chain] = [{"seq": i, "hash": f"h{i}"} for i in range(5)]
+
+    hashes = fetch_chain_hashes(fake_server.base_url, _API_KEY, chain)
+
+    assert hashes == {i: f"h{i}" for i in range(5)}
+    assert fake_server.chain_requests == [
+        "/api/chains/chain%2F1?after_seq=-1",
+        "/api/chains/chain%2F1?after_seq=1",
+        "/api/chains/chain%2F1?after_seq=3",
+    ]
+
+
+def test_fetch_chain_hashes_of_an_unknown_chain_is_empty(fake_server):
+    assert fetch_chain_hashes(fake_server.base_url, _API_KEY, "nope") == {}

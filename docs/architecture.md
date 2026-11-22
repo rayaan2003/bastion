@@ -127,7 +127,11 @@ event with the one before it in its chain (a SQL window over `seq`) and
 lists gaps and broken links. Recomputing the SDK's SHA-256 in TypeScript
 would mean reproducing Python's exact JSON, and JSONB plus JS numbers lose
 it (`1.0` comes back as `1`), so content is checked by comparing the two
-copies' hashes instead (`bastion verify-audit --dashboard-url`, next).
+copies' hashes instead: `bastion verify-audit --dashboard-url` fetches each
+chain's `seq -> hash` (`GET /api/chains/<id>`, paged) and fails on a hash
+that differs or on dashboard events past the file's end. The comparison is
+done by the SDK, not the dashboard, so the side doing the checking is the
+one the person running it controls.
 Gaps are accepted, not rejected: the audit sink drops events while the
 dashboard is unreachable, and refusing later events would lose more.
 
