@@ -45,6 +45,7 @@ src/bastion/              the package (PyPI: `bastionguard`, import: `bastion`)
                             approval core every integration reuses — plus
                             guard()/guard_tools() for callables and LangChain tools
   audit.py                  AuditEvent, AuditLogger, JSONL sink
+  audit_chain.py            hash chaining of audit events and verifying a log
   scanning.py               regex-based PII/secrets detection
   dashboard.py              HTTP client for dashboard/ (audit sink, approvals, policy)
   approval/                 approval channels
@@ -55,7 +56,7 @@ src/bastion/              the package (PyPI: `bastionguard`, import: `bastion`)
     openai_agents.py          guarded_tools()
     claude_agent_sdk.py       guarded_hooks(), guarded_can_use_tool()
   mcp_proxy.py              stdio MCP proxy: checks tools/call, relays the rest
-  cli.py                    the `bastion` command (`bastion mcp-proxy`)
+  cli.py                    the `bastion` command (`mcp-proxy`, `verify-audit`)
 tests/                    pytest suite, one file per module — framework tests
                           run against the real installed package, never a mock
   e2e/                      SDK against a running dashboard + Postgres; skipped

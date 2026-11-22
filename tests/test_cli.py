@@ -1,4 +1,6 @@
+import json
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -6,6 +8,7 @@ import pytest
 from bastion import cli, mcp_proxy
 from bastion.approval import ApprovalHandler, AutoDenyHandler
 from bastion.approval.slack import SlackApprovalHandler
+from bastion.audit import AuditLogger
 from bastion.dashboard import DashboardApprovalHandler
 
 
@@ -63,3 +66,36 @@ def test_redact_approval_args_reaches_the_dashboard(start_proxy):
     )
     assert isinstance(handler, DashboardApprovalHandler)
     assert handler.redact_args is True
+
+
+def _chained_log(path: Path, n: int) -> Path:
+    audit = AuditLogger(log_path=str(path))
+    for _ in range(n):
+        audit.record("t", {}, "allowed", "")
+    return path
+
+
+def test_verify_audit_passes_an_untouched_log(tmp_path, capsys):
+    log = _chained_log(tmp_path / "audit.jsonl", 3)
+    assert cli.main(["verify-audit", str(log)]) == 0
+    assert capsys.readouterr().out == "no problems in 3 events across 1 chain\n"
+
+
+def test_verify_audit_fails_and_names_the_line(tmp_path, capsys):
+    log = _chained_log(tmp_path / "audit.jsonl", 3)
+    lines = log.read_text().splitlines(keepends=True)
+    log.write_text(lines[0] + lines[2])
+    chain_id = json.loads(lines[0])["chain_id"]
+
+    assert cli.main(["verify-audit", str(log)]) == 1
+    assert capsys.readouterr().out == (
+        f"line 2 (chain {chain_id}): event 1 is missing before seq 2\n"
+        "1 problem in 2 events across 1 chain\n"
+    )
+
+
+def test_verify_audit_rejects_a_missing_file(tmp_path, capsys):
+    with pytest.raises(SystemExit) as exit_info:
+        cli.main(["verify-audit", str(tmp_path / "nope.jsonl")])
+    assert exit_info.value.code == 2
+    assert "nope.jsonl" in capsys.readouterr().err

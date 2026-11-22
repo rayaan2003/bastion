@@ -13,6 +13,15 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   the dashboard's database. The MCP proxy takes `--redact-approval-args`.
   Off by default: reviewers usually need the real values to decide. Policy
   and the tool still get the raw args either way.
+- **Hash-chained audit log.** Every event now carries `chain_id`, `seq`,
+  `prev_hash` and `hash` (SHA-256), linking the events from one
+  `AuditLogger`. `bastion verify-audit [FILE]` (default
+  `~/.bastion/audit.jsonl`) reports events that were edited, removed or
+  reordered, by line, and exits 1 if any were. Events written by earlier
+  versions are counted and skipped. The file alone can't reveal a rewrite
+  with recomputed hashes or a truncated tail; the dashboard will hold the
+  outside copy next. `bastion.audit_chain.verify_audit_log()` is the same
+  check from Python.
 - `bastion.scanning.redact_value()`: `redact()` applied throughout a
   JSON-like value. The audit log's arg redaction now uses it.
 
