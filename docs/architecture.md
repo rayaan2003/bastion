@@ -118,7 +118,18 @@ call so the file is in `seq` order. A plain hash, not an HMAC: no key to
 manage, and it catches edits and gaps by anyone who doesn't recompute the
 chain. What a file can't show (a rewrite with recomputed hashes, or a
 truncated tail) needs a copy of each chain's latest hash held elsewhere,
-which is the dashboard's job next.
+which is the dashboard's job.
+
+**The dashboard checks that chains link; it doesn't recompute hashes.** It
+stores each event's chain fields, with `(chain_id, seq)` unique, so a second
+event can't take a seq already stored (409). The `/audit` page compares each
+event with the one before it in its chain (a SQL window over `seq`) and
+lists gaps and broken links. Recomputing the SDK's SHA-256 in TypeScript
+would mean reproducing Python's exact JSON, and JSONB plus JS numbers lose
+it (`1.0` comes back as `1`), so content is checked by comparing the two
+copies' hashes instead (`bastion verify-audit --dashboard-url`, next).
+Gaps are accepted, not rejected: the audit sink drops events while the
+dashboard is unreachable, and refusing later events would lose more.
 
 **How a block surfaces depends on the framework**, chosen so the model sees
 *why* and can react instead of the run crashing:

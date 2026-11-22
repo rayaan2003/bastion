@@ -360,6 +360,8 @@ line 3 (chain 9ea290f7-…): seq 2 was edited: its contents don't match its hash
 It exits 1 if an event was edited, removed or reordered. The file can't
 prove everything on its own: anyone who can rewrite it can recompute every
 hash, and events cut from the end of a chain leave a shorter, valid one.
+The [dashboard](#dashboard) keeps its own copy of every chain and lists
+gaps and broken links on its audit page.
 
 To send events elsewhere, pass any `Callable[[AuditEvent], None]`:
 

@@ -106,6 +106,10 @@ class DashboardAuditSink:
                         "reason": event.reason,
                         "call_id": event.call_id,
                         "approver": event.approver,
+                        "chain_id": event.chain_id,
+                        "seq": event.seq,
+                        "prev_hash": event.prev_hash,
+                        "hash": event.hash,
                     },
                     self.api_key,
                 )

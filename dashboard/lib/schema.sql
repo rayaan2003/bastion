@@ -20,6 +20,15 @@ ALTER TABLE audit_events ADD COLUMN IF NOT EXISTS call_id TEXT;
 CREATE INDEX IF NOT EXISTS idx_audit_events_call ON audit_events (call_id);
 ALTER TABLE audit_events ADD COLUMN IF NOT EXISTS approver TEXT;
 
+-- Hash chain (bastion.audit_chain in the SDK). NULL on events from SDKs that
+-- predate it. Unique per chain so a second event can't claim a seq already
+-- stored; NULLs don't collide, so older rows are unaffected.
+ALTER TABLE audit_events ADD COLUMN IF NOT EXISTS chain_id TEXT;
+ALTER TABLE audit_events ADD COLUMN IF NOT EXISTS seq INTEGER;
+ALTER TABLE audit_events ADD COLUMN IF NOT EXISTS prev_hash TEXT;
+ALTER TABLE audit_events ADD COLUMN IF NOT EXISTS hash TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_audit_events_chain_seq ON audit_events (chain_id, seq);
+
 CREATE TABLE IF NOT EXISTS approval_requests (
   id TEXT PRIMARY KEY,
   tool_name TEXT NOT NULL,

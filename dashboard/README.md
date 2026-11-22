@@ -4,8 +4,9 @@ Audit log viewer and human-approval queue for the `bastion` Python SDK
 (see the repo root). Two pages:
 
 - **`/audit`** — every tool-call decision the SDK recorded (allowed /
-  blocked / approved / denied), filterable by tool name, action, and
-  session id.
+  blocked / approved / denied), filterable by tool name, action, session,
+  call and chain id. The top of the page checks the SDK's hash chains and
+  lists any gaps or broken links between stored events.
 - **`/approvals`** — the live queue of actions waiting on a human reviewer,
   with Approve/Deny buttons.
 - **`/policy`** — edit the policy YAML the SDK enforces, instead of hand-

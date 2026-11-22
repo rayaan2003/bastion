@@ -1,3 +1,4 @@
+import { type ChainIntegrity, checkChains } from "@/lib/chains";
 import { listEvents } from "@/lib/events";
 
 // Reads live DB state and query-string filters on every request - never
@@ -24,6 +25,7 @@ export default async function AuditPage({
     action?: string;
     session_id?: string;
     call_id?: string;
+    chain_id?: string;
   }>;
 }) {
   const params = await searchParams;
@@ -32,11 +34,15 @@ export default async function AuditPage({
     action: params.action || undefined,
     sessionId: params.session_id || undefined,
     callId: params.call_id || undefined,
+    chainId: params.chain_id || undefined,
   });
+  const integrity = await checkChains();
 
   return (
     <div className="max-w-6xl mx-auto">
       <h1 className="text-xl font-semibold mb-4">Audit Log</h1>
+
+      <ChainIntegritySection integrity={integrity} />
 
       <form className="flex gap-3 mb-6 text-sm" method="get">
         <input
@@ -71,6 +77,12 @@ export default async function AuditPage({
           name="call_id"
           defaultValue={params.call_id ?? ""}
           placeholder="call id"
+          className="bg-neutral-900 border border-neutral-700 rounded px-3 py-1.5"
+        />
+        <input
+          name="chain_id"
+          defaultValue={params.chain_id ?? ""}
+          placeholder="chain id"
           className="bg-neutral-900 border border-neutral-700 rounded px-3 py-1.5"
         />
         <button
@@ -136,4 +148,45 @@ export default async function AuditPage({
       )}
     </div>
   );
+}
+
+function ChainIntegritySection({ integrity }: { integrity: ChainIntegrity }) {
+  const summary = `${count(integrity.events, "chained event")} across ${count(integrity.chains, "chain")}`;
+  if (integrity.problems.length === 0) {
+    return (
+      <p className="mb-6 text-sm text-green-400">
+        Hash chains intact: {summary}.
+      </p>
+    );
+  }
+  return (
+    <section className="mb-6 text-sm">
+      <p className="text-red-400 font-medium">Hash chain problems in {summary}:</p>
+      <ul className="mt-2 space-y-1 font-mono text-xs">
+        {integrity.problems.map((p) => (
+          <li key={`${p.chain_id}:${p.seq}`}>
+            <a
+              href={`/audit?chain_id=${encodeURIComponent(p.chain_id)}`}
+              className="text-neutral-500 hover:text-neutral-300 underline"
+              title={p.chain_id}
+            >
+              {p.chain_id.slice(0, 8)}
+            </a>{" "}
+            <span className="text-neutral-300">{p.problem}</span>
+          </li>
+        ))}
+      </ul>
+      {integrity.truncated ? (
+        <p className="mt-1 text-neutral-500">Showing the first {integrity.problems.length}.</p>
+      ) : null}
+      <p className="mt-2 text-neutral-500">
+        Missing events can also mean the dashboard was unreachable when the SDK sent them: it
+        drops events rather than hold up the agent. A broken link means an event was replaced.
+      </p>
+    </section>
+  );
+}
+
+function count(n: number, noun: string): string {
+  return `${n} ${noun}${n === 1 ? "" : "s"}`;
 }
