@@ -21,9 +21,11 @@ import pytest
 
 from bastion import Action, AuditLogger, PolicyEngine, Rule, guard
 from bastion.approval import ApprovalDecision, ApprovalRequest
+from bastion.audit_chain import verify_audit_log
 from bastion.dashboard import (
     DashboardApprovalHandler,
     dashboard_audit_sink,
+    fetch_chain_hashes,
     load_policy_from_dashboard,
 )
 
@@ -329,3 +331,37 @@ def test_audit_page_reports_gaps_and_broken_links(session_cookie):
     assert problems[gap] == ["events 1-2 are missing before seq 3"]
     assert problems[relinked] == ["seq 1 doesn't link to seq 0: one of them was replaced"]
     assert intact not in problems
+
+
+def test_local_log_is_checked_against_the_dashboards_copy(tmp_path):
+    log = tmp_path / "audit.jsonl"
+    audit = AuditLogger(log_path=str(log), session_id=f"e2e-{uuid.uuid4()}")
+    write_local, ship = audit.sink, dashboard_audit_sink(URL, API_KEY)
+
+    def both(event):
+        write_local(event)
+        ship(event)
+
+    audit.sink = both
+    for i in range(4):
+        audit.record("t", {"n": i}, "allowed", "")
+    assert ship.flush(timeout=30)
+
+    def against(chain_id: str) -> dict[int, str]:
+        return fetch_chain_hashes(URL, API_KEY, chain_id)
+
+    report = verify_audit_log(log, against)
+    assert (report.breaks, report.warnings) == ([], [])
+
+    log.write_text("".join(log.read_text().splitlines(keepends=True)[:2]))
+    assert verify_audit_log(log).breaks == []
+    assert [b.problem for b in verify_audit_log(log, against).breaks] == [
+        "the log ends at seq 1 but the dashboard has events up to seq 3: "
+        "events were cut from the end"
+    ]
+
+
+def test_chain_endpoint_needs_the_api_key_and_an_integer_after_seq():
+    assert _api("GET", "/api/chains/c?after_seq=-1", key="wrong-key")[0] == 401
+    assert _api("GET", "/api/chains/c?after_seq=x")[0] == 400
+    assert _api("GET", "/api/chains/c") == (200, {"links": [], "more": False})

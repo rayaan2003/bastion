@@ -5,17 +5,21 @@ Each AuditLogger is one chain: its events carry `chain_id`, `seq` (0, 1,
 2, ...), `prev_hash` (the previous event's `hash`, "" for the first) and
 `hash`. A chain only proves the log is internally consistent: whoever can
 rewrite the file can recompute every hash, and dropping a chain's last
-events leaves a shorter valid chain. Catching that needs a copy of the
-latest hashes kept somewhere else.
+events leaves a shorter valid chain. Catching that needs a copy kept
+somewhere else: pass `against=` to compare with the dashboard's.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+# chain_id -> {seq: hash} for every event the dashboard holds in that chain.
+ChainLookup = Callable[[str], dict[int, str]]
 
 
 def event_hash(fields: dict[str, Any]) -> str:
@@ -30,7 +34,7 @@ def event_hash(fields: dict[str, Any]) -> str:
 
 
 @dataclass(frozen=True)
-class ChainBreak:
+class ChainFinding:
     line: int
     chain_id: str
     problem: str
@@ -43,13 +47,23 @@ class ChainReport:
     # Events with no hash: written before bastion chained events, or stripped.
     # A stripped event still shows up as a gap in its chain.
     unchained: int
-    breaks: list[ChainBreak]
+    breaks: list[ChainFinding]
+    # Worth knowing but not evidence of tampering, e.g. events that never
+    # reached the dashboard.
+    warnings: list[ChainFinding] = field(default_factory=list)
 
 
-def verify_audit_log(path: str | Path) -> ChainReport:
-    """Check every chain in a JSONL audit log, in file order."""
+def verify_audit_log(path: str | Path, against: ChainLookup | None = None) -> ChainReport:
+    """Check every chain in a JSONL audit log, in file order.
+
+    against: look up another copy of each chain (the dashboard's) and
+    compare. That catches what the file alone can't: an event rewritten
+    with its hash recomputed, and events cut from the end of a chain.
+    """
     tips: dict[str, tuple[int, str]] = {}
-    breaks: list[ChainBreak] = []
+    # chain_id -> {seq: (line, hash)}, only needed to compare with `against`.
+    local: dict[str, dict[int, tuple[int, str]]] = {}
+    breaks: list[ChainFinding] = []
     events = unchained = 0
 
     with Path(path).open(encoding="utf-8") as f:
@@ -61,7 +75,7 @@ def verify_audit_log(path: str | Path) -> ChainReport:
             except json.JSONDecodeError:
                 event = None
             if not isinstance(event, dict):
-                breaks.append(ChainBreak(line_number, "", "not a JSON event"))
+                breaks.append(ChainFinding(line_number, "", "not a JSON event"))
                 continue
             if "hash" not in event:
                 unchained += 1
@@ -70,16 +84,61 @@ def verify_audit_log(path: str | Path) -> ChainReport:
 
             chain_id, seq, prev_hash = (event.get(k) for k in ("chain_id", "seq", "prev_hash"))
             if not isinstance(chain_id, str) or not isinstance(seq, int):
-                breaks.append(ChainBreak(line_number, "", "missing chain_id or seq"))
+                breaks.append(ChainFinding(line_number, "", "missing chain_id or seq"))
                 continue
 
             for problem in _problems(event, seq, prev_hash, tips.get(chain_id)):
-                breaks.append(ChainBreak(line_number, chain_id, problem))
+                breaks.append(ChainFinding(line_number, chain_id, problem))
             # Continue from this event even if it's broken, so one tampered
             # spot is reported once rather than on every later event.
             tips[chain_id] = (seq, event["hash"])
+            if against is not None:
+                local.setdefault(chain_id, {})[seq] = (line_number, event["hash"])
 
-    return ChainReport(events=events, chains=len(tips), unchained=unchained, breaks=breaks)
+    warnings: list[ChainFinding] = []
+    if against is not None:
+        for chain_id, links in local.items():
+            chain_breaks, chain_warnings = _compare(chain_id, links, against(chain_id))
+            breaks += chain_breaks
+            warnings += chain_warnings
+        breaks.sort(key=lambda b: b.line)
+    return ChainReport(
+        events=events, chains=len(tips), unchained=unchained, breaks=breaks, warnings=warnings
+    )
+
+
+def _compare(
+    chain_id: str, local: dict[int, tuple[int, str]], dashboard: dict[int, str]
+) -> tuple[list[ChainFinding], list[ChainFinding]]:
+    """Breaks and warnings from comparing one chain with the dashboard's copy."""
+    breaks: list[ChainFinding] = []
+    warnings: list[ChainFinding] = []
+
+    def line(seq: int) -> int:
+        return local[seq][0]
+
+    for seq, (_, hash_) in sorted(local.items()):
+        if seq in dashboard and dashboard[seq] != hash_:
+            problem = f"seq {seq} differs from the dashboard's copy: one of them was changed"
+            breaks.append(ChainFinding(line(seq), chain_id, problem))
+
+    last = max(local)
+    if dashboard and max(dashboard) > last:
+        problem = (
+            f"the log ends at seq {last} but the dashboard has events up to seq "
+            f"{max(dashboard)}: events were cut from the end"
+        )
+        breaks.append(ChainFinding(line(last), chain_id, problem))
+
+    unsent = sorted(seq for seq in local if seq not in dashboard)
+    if not dashboard:
+        problem = "the dashboard has no events from this chain"
+        warnings.append(ChainFinding(line(min(local)), chain_id, problem))
+    elif unsent:
+        events = f"{len(unsent)} event{'' if len(unsent) == 1 else 's'}"
+        problem = f"{events} never reached the dashboard, starting at seq {unsent[0]}"
+        warnings.append(ChainFinding(line(unsent[0]), chain_id, problem))
+    return breaks, warnings
 
 
 def _problems(

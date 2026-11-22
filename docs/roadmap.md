@@ -6,17 +6,17 @@ What's next, in priority order. Shipped work moves to
 
 ## Next
 
-1. **Tamper-evident audit, cross-check** — `bastion verify-audit
-   --dashboard-url` compares a local log's hashes with the dashboard's, so
-   a rewritten or truncated log no longer passes.
-2. **Multi-user dashboard** — projects, per-project API keys, roles, and
+1. **Multi-user dashboard** — projects, per-project API keys, roles, and
    named reviewers on approvals; SSO after that.
-3. **Policy hot-reload** from the dashboard without restarting the agent
+2. **Policy hot-reload** from the dashboard without restarting the agent
    (or the MCP proxy).
-4. **MCP proxy over HTTP** — Streamable HTTP transport for remote MCP
+3. **MCP proxy over HTTP** — Streamable HTTP transport for remote MCP
    servers, alongside stdio; and one approval per multi-round
    (`input_required`) tool call instead of one per round.
-5. **TypeScript SDK.**
+4. **TypeScript SDK.**
+5. **Whole-chain deletion check** — `verify-audit --dashboard-url` can't
+   notice a chain deleted entirely from the local log, since nothing left
+   names it; list the dashboard's chains for a time range to close that.
 
 ## Not planned
 
@@ -39,3 +39,5 @@ What's next, in priority order. Shipped work moves to
 - Optional redaction of args in Slack/dashboard approval requests.
 - Hash-chained audit events and `bastion verify-audit`.
 - The dashboard stores audit hash chains and shows gaps and broken links.
+- `bastion verify-audit --dashboard-url` cross-checks a local log with the
+  dashboard's copy.

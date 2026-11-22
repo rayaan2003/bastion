@@ -360,8 +360,20 @@ line 3 (chain 9ea290f7-…): seq 2 was edited: its contents don't match its hash
 It exits 1 if an event was edited, removed or reordered. The file can't
 prove everything on its own: anyone who can rewrite it can recompute every
 hash, and events cut from the end of a chain leave a shorter, valid one.
-The [dashboard](#dashboard) keeps its own copy of every chain and lists
-gaps and broken links on its audit page.
+The [dashboard](#dashboard) keeps its own copy of every chain (and lists
+gaps and broken links on its audit page), so compare against it to catch
+both:
+
+```
+$ BASTION_DASHBOARD_API_KEY=... bastion verify-audit audit.jsonl --dashboard-url https://...
+line 2 (chain 9ea290f7-…): the log ends at seq 1 but the dashboard has events up to seq 3: events were cut from the end
+warning: line 9 (chain 41d0c2aa-…): 2 events never reached the dashboard, starting at seq 6
+```
+
+Events the dashboard never received are a warning, not a failure: the
+audit sink drops events while the dashboard is unreachable. Deleting every
+event of a chain from the file still goes unnoticed, since nothing left in
+the file names that chain.
 
 To send events elsewhere, pass any `Callable[[AuditEvent], None]`:
 

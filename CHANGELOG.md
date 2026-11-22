@@ -18,10 +18,14 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   `AuditLogger`. `bastion verify-audit [FILE]` (default
   `~/.bastion/audit.jsonl`) reports events that were edited, removed or
   reordered, by line, and exits 1 if any were. Events written by earlier
-  versions are counted and skipped. The file alone can't reveal a rewrite
-  with recomputed hashes or a truncated tail; the dashboard will hold the
-  outside copy next. `bastion.audit_chain.verify_audit_log()` is the same
-  check from Python.
+  versions are counted and skipped. `bastion.audit_chain.verify_audit_log()`
+  is the same check from Python.
+- **`bastion verify-audit --dashboard-url`** also compares each chain with
+  the dashboard's copy, catching what the file alone can't: an event
+  rewritten with its hash recomputed, and events cut from the end. Events
+  the dashboard never received are reported as warnings and don't fail the
+  check. New: `GET /api/chains/<chain_id>` on the dashboard and
+  `bastion.dashboard.fetch_chain_hashes()`.
 - **The dashboard keeps the hash chain.** `DashboardAuditSink` sends
   `chain_id`, `seq`, `prev_hash` and `hash`; the dashboard stores them
   (migrated on startup) and refuses, with a 409, an event that claims a
