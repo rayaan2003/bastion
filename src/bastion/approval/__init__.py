@@ -17,6 +17,7 @@ from typing import Any
 class ApprovalRequest:
     tool_name: str
     # Raw, not redacted: a reviewer usually needs the real values to decide.
+    # Channels that send them somewhere else offer `redact_args`.
     args: dict[str, Any]
     reason: str
     # Same ids as the call's audit events, so a channel can link back to them.

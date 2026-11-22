@@ -58,6 +58,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         metavar="USER_ID",
         help="Slack user id allowed to decide; repeat for several (default: anyone)",
     )
+    proxy.add_argument(
+        "--redact-approval-args",
+        action="store_true",
+        help="mask PII/secrets in the args shown to Slack or dashboard reviewers",
+    )
     proxy.add_argument("server", nargs=argparse.REMAINDER, help="-- then the MCP server command")
 
     args = parser.parse_args(argv)
@@ -104,14 +109,21 @@ def _approval_handler(args: argparse.Namespace) -> ApprovalHandler:
         from bastion.approval.slack import SlackApprovalHandler
 
         return SlackApprovalHandler(
-            _env("SLACK_BOT_TOKEN"), args.slack_channel, approvers=args.slack_approver
+            _env("SLACK_BOT_TOKEN"),
+            args.slack_channel,
+            approvers=args.slack_approver,
+            redact_args=args.redact_approval_args,
         )
     if args.approval == "dashboard":
         if not args.dashboard_url:
             raise ValueError("--approval dashboard needs --dashboard-url")
         from bastion.dashboard import DashboardApprovalHandler
 
-        return DashboardApprovalHandler(args.dashboard_url, _env("BASTION_DASHBOARD_API_KEY"))
+        return DashboardApprovalHandler(
+            args.dashboard_url,
+            _env("BASTION_DASHBOARD_API_KEY"),
+            redact_args=args.redact_approval_args,
+        )
     return AutoDenyHandler()
 
 

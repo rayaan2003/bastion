@@ -17,6 +17,7 @@ from collections.abc import Iterable
 from typing import Any
 
 from bastion.approval import ApprovalDecision, ApprovalHandler, ApprovalRequest
+from bastion.scanning import redact_value
 
 
 class SlackApprovalHandler(ApprovalHandler):
@@ -30,12 +31,17 @@ class SlackApprovalHandler(ApprovalHandler):
         poll_interval: float = 5.0,
         timeout: float = 300.0,
         approvers: Iterable[str] | None = None,
+        redact_args: bool = False,
         client: Any | None = None,
     ) -> None:
         """
         approvers: Slack user ids (`U024BE7LH`) who may decide. Reactions
         from anyone else, approve or deny, are ignored. None lets anyone in
         the channel decide.
+
+        redact_args: mask PII/secrets (see bastion.scanning) in the args
+        posted to Slack. Reviewers then decide without seeing those values,
+        but they don't end up in Slack's message history.
 
         client: inject a pre-built slack_sdk.WebClient (or a test double
         with matching chat_postMessage/reactions_get methods). If omitted,
@@ -63,11 +69,13 @@ class SlackApprovalHandler(ApprovalHandler):
         self.deny_emoji = deny_emoji
         self.poll_interval = poll_interval
         self.timeout = timeout
+        self.redact_args = redact_args
 
     def request_approval(self, request: ApprovalRequest) -> ApprovalDecision:
+        args = redact_value(request.args) if self.redact_args else request.args
         text = (
             f":rotating_light: *Approval required* for tool `{request.tool_name}`\n"
-            f"*Args:* `{request.args}`\n"
+            f"*Args:* `{args}`\n"
             f"*Reason:* {request.reason}\n"
             f"*Call:* `{request.call_id}`\n\n"
             f"React :{self.approve_emoji}: to approve or :{self.deny_emoji}: to deny "

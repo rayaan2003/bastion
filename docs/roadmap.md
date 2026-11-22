@@ -6,18 +6,16 @@ What's next, in priority order. Shipped work moves to
 
 ## Next
 
-1. **Approval controls** — optional redaction of args shown in
-   Slack/dashboard approval requests.
-2. **Tamper-evident audit** — hash-chained events so gaps or edits are
+1. **Tamper-evident audit** — hash-chained events so gaps or edits are
    detectable.
-3. **Multi-user dashboard** — projects, per-project API keys, roles, and
+2. **Multi-user dashboard** — projects, per-project API keys, roles, and
    named reviewers on approvals; SSO after that.
-4. **Policy hot-reload** from the dashboard without restarting the agent
+3. **Policy hot-reload** from the dashboard without restarting the agent
    (or the MCP proxy).
-5. **MCP proxy over HTTP** — Streamable HTTP transport for remote MCP
+4. **MCP proxy over HTTP** — Streamable HTTP transport for remote MCP
    servers, alongside stdio; and one approval per multi-round
    (`input_required`) tool call instead of one per round.
-6. **TypeScript SDK.**
+5. **TypeScript SDK.**
 
 ## Not planned
 
@@ -37,3 +35,4 @@ What's next, in priority order. Shipped work moves to
 - Approval waits run off the event loop in every async integration.
 - Slack approver allow-list.
 - MCP proxy (stdio): policy for any MCP client without code changes.
+- Optional redaction of args in Slack/dashboard approval requests.

@@ -97,6 +97,21 @@ def redact(
     return text
 
 
+def redact_value(value: Any) -> Any:
+    """`redact()` applied throughout a JSON-like value, keeping its structure."""
+    if isinstance(value, str):
+        return redact(value)
+    if isinstance(value, dict):
+        return {k: redact_value(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [redact_value(v) for v in value]
+    # A card number passed as an int is still a card number.
+    if isinstance(value, int | float) and not isinstance(value, bool):
+        text = str(value)
+        return redact(text) if scan_text(text) else value
+    return value
+
+
 def contains_pii(categories: list[str] | None = None) -> Callable[[dict[str, Any]], bool]:
     """A PolicyEngine condition: matches if any tool-call arg contains a
     detected PII/secret category. Use as `Rule(condition=contains_pii(...))`.
