@@ -327,7 +327,12 @@ Every decision is recorded. By default it's appended to
   "args": {"customer_id": "cus_9"},
   "action": "blocked",
   "reason": "irreversible",
-  "call_id": "0b7e3f0c-5a1d-4a8e-9c63-2f5e1d7b9a44"
+  "call_id": "0b7e3f0c-5a1d-4a8e-9c63-2f5e1d7b9a44",
+  "approver": "",
+  "chain_id": "9ea290f7-0fb4-4792-85e6-b5d85e4a7be1",
+  "seq": 3,
+  "prev_hash": "4f1c…",
+  "hash": "bc06…"
 }
 ```
 
@@ -342,6 +347,19 @@ PII and secrets in args are masked in the log
 (`"ssn [REDACTED:ssn_us]"`) using the [scanner](#piisecrets-scanning).
 Policy rules and the tool itself still get the real values. Pass
 `AuditLogger(redact_args=False)` to log args as-is.
+
+Events are hash-chained: each `AuditLogger`'s events count up in `seq`
+and carry the previous event's `hash`. To check a log:
+
+```
+$ bastion verify-audit ~/.bastion/audit.jsonl
+line 3 (chain 9ea290f7-…): seq 2 was edited: its contents don't match its hash
+1 problem in 4 events across 1 chain
+```
+
+It exits 1 if an event was edited, removed or reordered. The file can't
+prove everything on its own: anyone who can rewrite it can recompute every
+hash, and events cut from the end of a chain leave a shorter, valid one.
 
 To send events elsewhere, pass any `Callable[[AuditEvent], None]`:
 

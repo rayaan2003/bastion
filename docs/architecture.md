@@ -40,12 +40,13 @@ dashboard/  Next.js + Postgres: audit log, approval queue, policy editor
 | `config.py` | YAML → `PolicyEngine`, condition-type registry |
 | `guard.py` | `evaluate_and_record()`, `guard()` / `guard_tools()` for plain callables and LangChain tools |
 | `audit.py` | `AuditEvent`, `AuditLogger`, JSONL sink |
+| `audit_chain.py` | hash chaining of audit events; verifying a log |
 | `approval/` | `ApprovalHandler` interface, console handler, `slack.py` |
 | `scanning.py` | regex PII/secrets detectors, `contains_pii` condition |
 | `dashboard.py` | HTTP client for `dashboard/`: audit sink, approval handler, policy fetch |
 | `integrations/` | agent-framework adapters only |
 | `mcp_proxy.py` | stdio MCP proxy that checks `tools/call` and relays everything else |
-| `cli.py` | the `bastion` command (`bastion mcp-proxy`) |
+| `cli.py` | the `bastion` command (`mcp-proxy`, `verify-audit`) |
 
 ### Where new things go
 
@@ -104,6 +105,20 @@ since a reviewer usually needs the real values to decide; the Slack and
 dashboard handlers take `redact_args=True` for teams that would rather not
 copy them into another system. It's a per-channel option rather than part
 of `ApprovalRequest` because the console handler sends nothing anywhere.
+
+**The audit log is hash-chained per `AuditLogger`, not per session.**
+Each event carries `chain_id`, `seq`, `prev_hash` and a SHA-256 `hash` over
+its other fields, as canonical JSON (sorted keys, after a JSON round trip
+so it can be recomputed from the file). The chain covers the redacted args,
+since those are what's stored. Chains are keyed on their own id because
+callers choose session ids and several processes append to one file
+(`~/.bastion/audit.jsonl` behind several MCP proxies); a chain per session
+would need cross-process locking. `record()` holds a lock through the sink
+call so the file is in `seq` order. A plain hash, not an HMAC: no key to
+manage, and it catches edits and gaps by anyone who doesn't recompute the
+chain. What a file can't show (a rewrite with recomputed hashes, or a
+truncated tail) needs a copy of each chain's latest hash held elsewhere,
+which is the dashboard's job next.
 
 **How a block surfaces depends on the framework**, chosen so the model sees
 *why* and can react instead of the run crashing:

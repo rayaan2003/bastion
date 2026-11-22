@@ -6,8 +6,9 @@ What's next, in priority order. Shipped work moves to
 
 ## Next
 
-1. **Tamper-evident audit** — hash-chained events so gaps or edits are
-   detectable.
+1. **Tamper-evident audit, part 2** — the dashboard stores each event's
+   chain fields and checks incoming events against the chain, so a rewritten
+   or truncated local log no longer matches; chain breaks shown in the UI.
 2. **Multi-user dashboard** — projects, per-project API keys, roles, and
    named reviewers on approvals; SSO after that.
 3. **Policy hot-reload** from the dashboard without restarting the agent
@@ -36,3 +37,4 @@ What's next, in priority order. Shipped work moves to
 - Slack approver allow-list.
 - MCP proxy (stdio): policy for any MCP client without code changes.
 - Optional redaction of args in Slack/dashboard approval requests.
+- Hash-chained audit events and `bastion verify-audit`.

@@ -10,6 +10,7 @@ from pathlib import Path
 
 from bastion.approval import ApprovalHandler, AutoDenyHandler
 from bastion.audit import AuditLogger
+from bastion.audit_chain import verify_audit_log
 from bastion.config import PolicyConfigError, load_policy_from_yaml
 from bastion.policy import PolicyEngine
 
@@ -65,7 +66,26 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     proxy.add_argument("server", nargs=argparse.REMAINDER, help="-- then the MCP server command")
 
+    verify = commands.add_parser(
+        "verify-audit",
+        help="check a JSONL audit log's hash chains for edited or missing events",
+        description=(
+            "Exit 1 if any event was edited, removed or reordered. Events cut "
+            "from the end of a chain can't be detected from the file alone."
+        ),
+    )
+    verify.add_argument(
+        "log",
+        type=Path,
+        nargs="?",
+        default=DEFAULT_AUDIT_LOG,
+        help="audit log (default: ~/.bastion/audit.jsonl)",
+    )
+
     args = parser.parse_args(argv)
+    if args.command == "verify-audit":
+        return _verify_audit(parser, args.log)
+
     server = args.server[1:] if args.server[:1] == ["--"] else args.server
     if not server:
         parser.error("give the MCP server command after --")
@@ -80,6 +100,31 @@ def main(argv: Sequence[str] | None = None) -> int:
     from bastion.mcp_proxy import run_proxy
 
     return asyncio.run(run_proxy(server, policy=policy, audit=audit, approval_handler=handler))
+
+
+def _verify_audit(parser: argparse.ArgumentParser, log: Path) -> int:
+    try:
+        report = verify_audit_log(log)
+    except OSError as e:
+        parser.error(str(e))
+    for b in report.breaks:
+        chain = f" (chain {b.chain_id})" if b.chain_id else ""
+        print(f"line {b.line}{chain}: {b.problem}")
+    problems = _count(len(report.breaks), "problem").replace("0 problems", "no problems")
+    print(
+        f"{problems} in {_count(report.events, 'event')} "
+        f"across {_count(report.chains, 'chain')}"
+    )
+    if report.unchained:
+        print(
+            f"{_count(report.unchained, 'event')} with no hash "
+            "(written before bastion chained events)"
+        )
+    return 1 if report.breaks else 0
+
+
+def _count(n: int, noun: str) -> str:
+    return f"{n} {noun}{'' if n == 1 else 's'}"
 
 
 def _policy(args: argparse.Namespace) -> PolicyEngine:
