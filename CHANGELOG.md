@@ -22,6 +22,12 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   with recomputed hashes or a truncated tail; the dashboard will hold the
   outside copy next. `bastion.audit_chain.verify_audit_log()` is the same
   check from Python.
+- **The dashboard keeps the hash chain.** `DashboardAuditSink` sends
+  `chain_id`, `seq`, `prev_hash` and `hash`; the dashboard stores them
+  (migrated on startup) and refuses, with a 409, an event that claims a
+  seq its chain already has. The `/audit` page lists gaps and broken links
+  in every chain, and filters by `chain_id`. Events from older SDKs are
+  stored without chain fields, as before.
 - `bastion.scanning.redact_value()`: `redact()` applied throughout a
   JSON-like value. The audit log's arg redaction now uses it.
 

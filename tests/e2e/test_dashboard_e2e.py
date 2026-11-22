@@ -5,9 +5,11 @@ job starts one on a database seeded with the v0.1.0 schema plus one row
 written the v0.1.0 way, so these tests also prove the startup migrations.
 """
 
+import html
 import http.client
 import json
 import os
+import re
 import threading
 import time
 import urllib.parse
@@ -105,6 +107,8 @@ def test_row_written_before_the_migrations_survives_them():
     assert legacy["id"] == "legacy-1"
     assert legacy["call_id"] is None
     assert legacy["approver"] is None
+    assert legacy["chain_id"] is None
+    assert legacy["seq"] is None
 
 
 def test_events_round_trip_with_outcomes_and_redaction():
@@ -244,3 +248,84 @@ def test_policy_saved_in_the_ui_is_enforced_by_the_sdk(session_cookie):
     decision = load_policy_from_dashboard(URL, API_KEY).evaluate(tool, {})
     assert decision.action == Action.BLOCK
     assert decision.reason == "set from the UI"
+
+
+def _post_link(chain_id: str, seq: int, prev_hash: str, hash_: str, event_id: str = "") -> int:
+    status, _ = _api(
+        "POST",
+        "/api/events",
+        {
+            "id": event_id or str(uuid.uuid4()),
+            "session_id": "e2e-chain",
+            "tool_name": "t",
+            "action": "allowed",
+            "chain_id": chain_id,
+            "seq": seq,
+            "prev_hash": prev_hash,
+            "hash": hash_,
+        },
+    )
+    return status
+
+
+def _chain_problems(cookie: str) -> dict[str, list[str]]:
+    status, page, _ = _page("/audit", cookie)
+    assert status == 200
+    problems: dict[str, list[str]] = {}
+    for chain_id, problem in re.findall(
+        r'<a [^>]*title="([^"]+)"[^>]*>[^<]*</a> <span[^>]*>([^<]*)</span>', page
+    ):
+        problems.setdefault(chain_id, []).append(html.unescape(problem))
+    return problems
+
+
+def test_sdk_events_are_stored_with_their_chain(session_cookie):
+    sink = dashboard_audit_sink(URL, API_KEY)
+    audit = AuditLogger(session_id=f"e2e-{uuid.uuid4()}", sink=sink)
+    sent = [audit.record("t", {"n": i}, "allowed", "") for i in range(3)]
+    assert sink.flush(timeout=30)
+
+    stored = sorted(_events(chain_id=audit.chain_id), key=lambda e: e["seq"])
+    assert [(e["seq"], e["prev_hash"], e["hash"]) for e in stored] == [
+        (e.seq, e.prev_hash, e.hash) for e in sent
+    ]
+    assert audit.chain_id not in _chain_problems(session_cookie)
+
+
+def test_event_claiming_a_taken_seq_is_rejected():
+    chain = f"e2e-{uuid.uuid4()}"
+    first = str(uuid.uuid4())
+    assert _post_link(chain, 0, "", "h0", event_id=first) == 201
+    assert _post_link(chain, 0, "", "h0", event_id=first) == 201, "a resend isn't a conflict"
+    assert _post_link(chain, 0, "", "forged") == 409
+    assert [e["hash"] for e in _events(chain_id=chain)] == ["h0"]
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"chain_id": "c"},
+        {"chain_id": "c", "seq": "1", "prev_hash": "", "hash": "h"},
+        {"chain_id": "c", "seq": -1, "prev_hash": "", "hash": "h"},
+        {"chain_id": "c", "seq": 2**31, "prev_hash": "", "hash": "h"},
+        {"chain_id": "", "seq": 0, "prev_hash": "", "hash": "h"},
+    ],
+)
+def test_malformed_chain_fields_are_rejected(fields):
+    payload = {"id": str(uuid.uuid4()), "session_id": "s", "tool_name": "t", "action": "allowed"}
+    status, _ = _api("POST", "/api/events", payload | fields)
+    assert status == 400
+
+
+def test_audit_page_reports_gaps_and_broken_links(session_cookie):
+    gap, relinked, intact = (f"e2e-{uuid.uuid4()}" for _ in range(3))
+    for chain in (gap, relinked, intact):
+        assert _post_link(chain, 0, "", f"{chain}-h0") == 201
+    assert _post_link(gap, 3, f"{gap}-h2", f"{gap}-h3") == 201
+    assert _post_link(relinked, 1, "not-h0", f"{relinked}-h1") == 201
+    assert _post_link(intact, 1, f"{intact}-h0", f"{intact}-h1") == 201
+
+    problems = _chain_problems(session_cookie)
+    assert problems[gap] == ["events 1-2 are missing before seq 3"]
+    assert problems[relinked] == ["seq 1 doesn't link to seq 0: one of them was replaced"]
+    assert intact not in problems

@@ -10,7 +10,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 import pytest
 
 from bastion.approval import ApprovalDecision, ApprovalRequest
-from bastion.audit import AuditEvent
+from bastion.audit import AuditEvent, AuditLogger
 from bastion.dashboard import (
     DashboardApprovalHandler,
     dashboard_audit_sink,
@@ -146,6 +146,23 @@ def test_dashboard_audit_sink_posts_event(fake_server):
     assert fake_server.received_events[0]["action"] == "blocked"
     assert fake_server.received_events[0]["call_id"] == ""
     assert fake_server.received_events[0]["approver"] == ""
+
+
+def test_dashboard_audit_sink_sends_the_hash_chain(fake_server):
+    sink = dashboard_audit_sink(fake_server.base_url, _API_KEY)
+    audit = AuditLogger(sink=sink)
+    first = audit.record("a", {}, "allowed", "")
+    second = audit.record("b", {}, "allowed", "")
+    assert sink.flush(timeout=5)
+
+    sent = [
+        {k: e[k] for k in ("chain_id", "seq", "prev_hash", "hash")}
+        for e in fake_server.received_events
+    ]
+    assert sent == [
+        {"chain_id": audit.chain_id, "seq": 0, "prev_hash": "", "hash": first.hash},
+        {"chain_id": audit.chain_id, "seq": 1, "prev_hash": first.hash, "hash": second.hash},
+    ]
 
 
 def test_dashboard_audit_sink_serializes_non_json_args(fake_server):

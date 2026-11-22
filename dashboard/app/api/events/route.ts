@@ -1,6 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireApiKey } from "@/lib/credentials";
-import { insertEvent, listEvents } from "@/lib/events";
+import { type ChainLink, insertEvent, listEvents } from "@/lib/events";
+
+// The seq column is a Postgres INTEGER.
+const MAX_SEQ = 2 ** 31 - 1;
+
+// SDKs older than the hash chain send none of these fields.
+function parseChainLink(body: Record<string, unknown>): ChainLink | null | "invalid" {
+  const { chain_id, seq, prev_hash, hash } = body;
+  if ([chain_id, seq, prev_hash, hash].every((field) => field === undefined)) return null;
+  if (
+    typeof chain_id !== "string" ||
+    !chain_id ||
+    typeof seq !== "number" ||
+    !Number.isInteger(seq) ||
+    seq < 0 ||
+    seq > MAX_SEQ ||
+    typeof prev_hash !== "string" ||
+    typeof hash !== "string" ||
+    !hash
+  ) {
+    return "invalid";
+  }
+  return { chain_id, seq, prev_hash, hash };
+}
 
 export async function POST(request: NextRequest) {
   const unauthorized = requireApiKey(request);
@@ -16,8 +39,19 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   }
+  const chain = parseChainLink(body);
+  if (chain === "invalid") {
+    return NextResponse.json(
+      {
+        error:
+          "chain_id, seq, prev_hash and hash go together: non-empty chain_id and hash, " +
+          "seq a non-negative integer, prev_hash a string",
+      },
+      { status: 400 }
+    );
+  }
 
-  await insertEvent({
+  const inserted = await insertEvent({
     id,
     timestamp: timestamp ?? Date.now() / 1000,
     session_id,
@@ -27,7 +61,14 @@ export async function POST(request: NextRequest) {
     reason: reason ?? "",
     call_id: call_id || null,
     approver: approver || null,
+    chain,
   });
+  if (!inserted) {
+    return NextResponse.json(
+      { error: `chain ${chain?.chain_id} already has a different event at seq ${chain?.seq}` },
+      { status: 409 }
+    );
+  }
 
   return NextResponse.json({ ok: true }, { status: 201 });
 }
@@ -42,6 +83,7 @@ export async function GET(request: NextRequest) {
     action: searchParams.get("action") ?? undefined,
     sessionId: searchParams.get("session_id") ?? undefined,
     callId: searchParams.get("call_id") ?? undefined,
+    chainId: searchParams.get("chain_id") ?? undefined,
     limit: searchParams.get("limit") ? Number(searchParams.get("limit")) : undefined,
   });
   return NextResponse.json({ events });
