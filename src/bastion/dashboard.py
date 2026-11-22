@@ -22,6 +22,7 @@ from bastion.approval import ApprovalDecision, ApprovalHandler, ApprovalRequest
 from bastion.audit import AuditEvent
 from bastion.config import policy_from_yaml_string
 from bastion.policy import PolicyEngine
+from bastion.scanning import redact_value
 
 _log = logging.getLogger("bastion")
 
@@ -149,6 +150,10 @@ class DashboardApprovalHandler(ApprovalHandler):
     """Creates a pending approval in the dashboard and polls until a
     reviewer approves/denies it from the /approvals page there. Fails
     closed (denies) if nobody responds within `timeout`.
+
+    redact_args: mask PII/secrets (see bastion.scanning) in the args sent
+    to the dashboard, so reviewers don't see them and the dashboard's
+    database doesn't store them.
     """
 
     def __init__(
@@ -158,18 +163,20 @@ class DashboardApprovalHandler(ApprovalHandler):
         *,
         poll_interval: float = 5.0,
         timeout: float = 300.0,
+        redact_args: bool = False,
     ):
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.poll_interval = poll_interval
         self.timeout = timeout
+        self.redact_args = redact_args
 
     def request_approval(self, request: ApprovalRequest) -> ApprovalDecision:
         created = _post_json(
             f"{self.base_url}/api/approvals",
             {
                 "tool_name": request.tool_name,
-                "args": request.args,
+                "args": redact_value(request.args) if self.redact_args else request.args,
                 "reason": request.reason,
                 "call_id": request.call_id,
                 "session_id": request.session_id,

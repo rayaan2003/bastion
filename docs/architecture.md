@@ -99,8 +99,11 @@ results by default.
 detected PII/secrets in the logged copy of args by default (strings, nested
 containers, and numbers such as a card passed as an int). Policy conditions
 and the tool always get the raw args — redacting before evaluation would
-blind `contains_pii` rules. Approval requests are not redacted, since a
-reviewer usually needs the real values to decide.
+blind `contains_pii` rules. Approval requests are not redacted by default,
+since a reviewer usually needs the real values to decide; the Slack and
+dashboard handlers take `redact_args=True` for teams that would rather not
+copy them into another system. It's a per-channel option rather than part
+of `ApprovalRequest` because the console handler sends nothing anywhere.
 
 **How a block surfaces depends on the framework**, chosen so the model sees
 *why* and can react instead of the run crashing:

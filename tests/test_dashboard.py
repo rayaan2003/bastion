@@ -208,6 +208,23 @@ def test_dashboard_approval_handler_polls_until_approved(fake_server):
     assert (created["call_id"], created["session_id"]) == ("call-9", "sess-1")
 
 
+def test_dashboard_approval_handler_redact_args_masks_pii_sent_to_the_dashboard(fake_server):
+    request = ApprovalRequest(
+        tool_name="lookup",
+        args={"q": "ssn 123-45-6789", "n": 3},
+        reason="pii",
+        call_id="call-9",
+        session_id="sess-1",
+    )
+    handler = DashboardApprovalHandler(
+        fake_server.base_url, _API_KEY, poll_interval=0.01, timeout=5, redact_args=True
+    )
+    handler.request_approval(request)
+
+    [created] = fake_server.approvals.values()
+    assert created["args"] == {"q": "ssn [REDACTED:ssn_us]", "n": 3}
+
+
 def test_dashboard_approval_handler_denies_on_timeout():
     server = _FakeDashboardServer(approve_after=10_000)  # never approves within the timeout
     try:

@@ -144,6 +144,7 @@ tool name and what the policy would have done, and nothing is blocked.
 | `--policy FILE` | YAML policy |
 | `--approval slack` | ask in Slack: `--slack-channel`, `--slack-approver USER_ID` (repeatable), `$SLACK_BOT_TOKEN` |
 | `--approval dashboard` | queue approvals on the [dashboard](#dashboard) |
+| `--redact-approval-args` | mask PII/secrets in the args reviewers see |
 | `--dashboard-url URL` | send audit events there, and load the policy from it when `--policy` is omitted (`$BASTION_DASHBOARD_API_KEY`) |
 | `--audit-log FILE` | default `~/.bastion/audit.jsonl` |
 
@@ -294,6 +295,11 @@ guarded = guard(refund, policy=policy, approval_handler=approvals)
 The [dashboard](#dashboard) provides an approval queue as well
 (`DashboardApprovalHandler`). It records where a decision was made, not
 who, since the dashboard has one shared login.
+
+Reviewers see the raw args by default, since they usually need the real
+values to decide. Pass `redact_args=True` to either handler to mask
+PII/secrets first, so they don't end up in Slack's history or the
+dashboard's database.
 
 For your own channel, subclass `ApprovalHandler`:
 

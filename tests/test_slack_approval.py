@@ -117,3 +117,28 @@ def test_empty_approver_list_is_rejected():
 def test_single_string_approver_is_rejected():
     with pytest.raises(TypeError, match="list of user ids"):
         _handler(FakeSlackClient([{}]), approvers="U0LEAD")
+
+
+def _request_with_pii() -> ApprovalRequest:
+    return ApprovalRequest(
+        tool_name="send_email",
+        args={"to": "a.b@example.com", "body": "hi"},
+        reason="outbound email",
+        call_id="call-1",
+        session_id="sess-1",
+    )
+
+
+def test_args_are_posted_raw_by_default():
+    client = FakeSlackClient([{"white_check_mark": ["U0LEAD"]}])
+    _handler(client).request_approval(_request_with_pii())
+    assert client.posted is not None
+    assert "a.b@example.com" in client.posted["text"]
+
+
+def test_redact_args_masks_pii_in_the_posted_message():
+    client = FakeSlackClient([{"white_check_mark": ["U0LEAD"]}])
+    _handler(client, redact_args=True).request_approval(_request_with_pii())
+    assert client.posted is not None
+    assert "a.b@example.com" not in client.posted["text"]
+    assert "[REDACTED:email]" in client.posted["text"]

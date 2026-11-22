@@ -5,6 +5,17 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added
+
+- **Redacted approval requests.** `SlackApprovalHandler(redact_args=True)`
+  and `DashboardApprovalHandler(redact_args=True)` mask PII/secrets in the
+  args reviewers see, so they aren't copied into Slack's message history or
+  the dashboard's database. The MCP proxy takes `--redact-approval-args`.
+  Off by default: reviewers usually need the real values to decide. Policy
+  and the tool still get the raw args either way.
+- `bastion.scanning.redact_value()`: `redact()` applied throughout a
+  JSON-like value. The audit log's arg redaction now uses it.
+
 ## [0.2.0] - 2026-11-06
 
 ### Added
